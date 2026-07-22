@@ -24,7 +24,7 @@ export interface TypedResponse {
 export type RouteHandler = (
   req: TypedRequest,
   res: TypedResponse,
-) => void | Promise<void | TypedResponse>;
+) => void | Promise<TypedResponse> | Promise<void>;
 
 export interface DefineRouteOptions<TBody extends z.ZodType | undefined = undefined> {
   body?: TBody extends z.ZodType ? { schema: TBody; skipValidation?: boolean } : undefined;
