@@ -12,10 +12,14 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
   },
+  "exports": {
+    "./schema": "./src/db/schema/types.ts"
+  },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.9",
-    "tsx": "^4.23.1"
+    "tsx": "^4.23.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^24",

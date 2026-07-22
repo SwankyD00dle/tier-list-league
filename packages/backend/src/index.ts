@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { sql } from "drizzle-orm";
-import { db } from "./db/client";
+import { db } from "./database/client";
 
 const port = Number(process.env.PORT ?? 3001);
 
