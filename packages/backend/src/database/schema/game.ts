@@ -8,11 +8,7 @@ const game = pgTable(
     id: uuid("game_id").unique().primaryKey(),
     name: text("name").notNull(),
     description: text("description").notNull(),
-    participants: uuid("participant_ids")
-      .array()
-      .references(() => user.id)
-      .notNull()
-      .default([]),
+    participants: uuid("participant_ids").array().notNull().default([]),
     roundCount: integer("round_count").notNull().default(1),
     rounds: uuid("round_ids").array().notNull().default([]),
     createdBy: uuid("created_by").references(() => user.id),

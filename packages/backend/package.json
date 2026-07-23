@@ -13,7 +13,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "exports": {
-    "./schema": "./src/db/schema/types.ts"
+    "./schema": "./src/database/schema/types.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
