@@ -2,57 +2,71 @@
 
 Node HTTP API backed by PostgreSQL, with schema and migrations managed by Drizzle. Runs in Docker.
 
-## Run with Docker (recommended)
+## Local development
+
+Run the full app from the repository root:
+
+```bash
+nvm use
+npm install
+npm run db:migrate --workspace @tier-list-league/backend
+npm run dev
+```
+
+The frontend and API share http://localhost:3000. Next.js proxies `/api/*` to the backend's internal listener on port 3001.
+
+To run only the backend:
+
+```bash
+cp packages/backend/.env.example packages/backend/.env
+npm run dev --workspace @tier-list-league/backend
+```
+
+## Run the backend with Docker
+
+From `packages/backend`:
 
 ```bash
 docker compose up --build
 ```
 
-This starts PostgreSQL and the backend (http://localhost:3001, health at `/health`).
-
-## Local development
-
-```bash
-nvm use
-npm install                                   # from the repo root
-cp packages/backend/.env.example packages/backend/.env
-npm run dev --workspace @tier-list-league/backend
-```
+This starts PostgreSQL and the standalone backend on its internal/development port 3001. The root `npm run dev` command is what exposes the combined frontend + API origin on port 3000.
 
 ## Migrations (Drizzle)
 
 ```bash
-npm run db:generate --workspace @tier-list-league/backend   # SQL from src/db/schema.ts -> ./drizzle
-npm run db:migrate  --workspace @tier-list-league/backend   # apply to DATABASE_URL
+npm run db:generate --workspace @tier-list-league/backend
+npm run db:migrate --workspace @tier-list-league/backend
 ```
 
 `db:push` (dev-only sync) and `db:studio` are also available.
 
 ## Scripts
 
-- `dev` / `start` — run the server with tsx.
+- `dev` / `start` — run the standalone backend on `PORT` (default 3001).
 - `typecheck` — type-check with TypeScript 7 (`tsc-native`).
+- `test` / `test:watch` — run route tests with Vitest.
 - `db:generate` / `db:migrate` / `db:push` / `db:studio` — Drizzle Kit.
 
 ## HTTP API
 
-The server (`npm run start`) mounts routes through a small router over `node:http`. Routes are defined with `defineRoute` under `src/api/routes/` and registered in `src/api/routes/index.ts`.
+Routes are defined under `src/api/routes/` and registered in `src/api/routes/index.ts`.
 
-| Method | Path              | Description            |
-| ------ | ----------------- | ---------------------- |
-| GET    | `/health`         | Liveness + DB probe    |
-| GET    | `/users`          | List users             |
-| POST   | `/users`          | Create a user          |
-| GET    | `/users/:id`      | Get a user by id       |
-| GET    | `/games`          | List games             |
-| GET    | `/games/:id`      | Get a game by id       |
-| GET    | `/rounds/:id`     | Get a round by id      |
-| GET    | `/tier-lists/:id` | Get a tier list by id  |
+| Method | Public path                | Description           |
+| ------ | -------------------------- | --------------------- |
+| GET    | `/api/health`              | Liveness + DB probe   |
+| GET    | `/api/users`               | List users            |
+| POST   | `/api/users`               | Create a user         |
+| GET    | `/api/users/:id`           | Get a user by id      |
+| GET    | `/api/games`               | List games            |
+| GET    | `/api/games/:id`           | Get a game by id      |
+| GET    | `/api/rounds/:id`          | Get a round by id     |
+| GET    | `/api/tier-lists/:id`      | Get a tier list by id |
 
-Example:
+Examples through the shared port:
 
 ```bash
-curl localhost:3001/users
-curl -X POST localhost:3001/users -H 'content-type: application/json' \
+curl http://localhost:3000/api/users
+curl -X POST http://localhost:3000/api/users -H 'content-type: application/json' \
   -d '{"name":"Ryan","discordUserId":"123","games":[]}'
 ```
