@@ -60,6 +60,9 @@ Routes are defined under `src/api/routes/` and registered in `src/api/routes/ind
 | GET    | `/api/users/:id`           | Get a user by id      |
 | GET    | `/api/games`               | List games            |
 | GET    | `/api/games/:id`           | Get a game by id      |
+| POST   | `/api/games/:gameId/score` | Record round scores   |
+| GET    | `/api/games/:gameId/score` | Get the scoreboard    |
+| GET    | `/api/games/:gameId/score/:userId` | Get a player's score |
 | GET    | `/api/rounds/:id`          | Get a round by id     |
 | GET    | `/api/tier-lists/:id`      | Get a tier list by id |
 
@@ -70,3 +73,37 @@ curl http://localhost:3000/api/users
 curl -X POST http://localhost:3000/api/users -H 'content-type: application/json' \
   -d '{"name":"Ryan","discordUserId":"123","games":[]}'
 ```
+
+### Scoring
+
+Scoring is calculated only by the backend. A winner receives 3 points and each honorable mention receives 1 point; clients submit awards, never point values.
+
+```text
+POST /api/games/:gameId/score
+GET  /api/games/:gameId/score
+GET  /api/games/:gameId/score/:userId
+```
+
+The POST body identifies the round, its recorded host, the winning guess, and honorable-mention guesses with display titles:
+
+```json
+{
+  "round": {
+    "id": "<round-uuid>",
+    "hostedBy": "<host-user-uuid>",
+    "winningGuess": "<guess-uuid>",
+    "honorableMentions": [
+      {
+        "guessId": "<guess-uuid>",
+        "title": "Answer was completely on point"
+      }
+    ]
+  }
+}
+```
+
+Score reads are keyed by user ID. Each player has a running `total` and only rounds where they scored. A round contains its summed `score` and an `entries` array because one player can receive multiple awards in the same round. Reposting a round replaces that round's prior entries atomically, so retries and corrections do not double-score.
+
+### Remaining UI API gaps
+
+The current API can read users, games, rounds, tier lists, and scores, and can create users. A complete game UI still needs mutation endpoints for games/participants, rounds, guesses, and participant tier lists, plus authentication so the server can verify the caller is the recorded host. A composite game-state endpoint may also be useful if the UI otherwise needs several requests to render one game screen.
