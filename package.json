@@ -18,5 +18,11 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.5",
     "tsc-native": "npm:typescript@^7.0.2"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.22",
+      "sharp": "0.35.3"
+    }
   }
 }
