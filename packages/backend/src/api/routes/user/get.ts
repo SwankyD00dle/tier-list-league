@@ -1,15 +1,10 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import type { db } from "../../../database/client";
 import user from "../../../database/schema/user";
 import type { BaseHandlerConfig } from "../../handler";
 import { defineRoute, type TypedRequest } from "../../route-helper";
 
-interface GetUserConfig extends BaseHandlerConfig {
-  db: typeof db;
-}
-
-export const getUser = (config: GetUserConfig) =>
+export const getUser = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
     summary: "Get user",
     description: "Get a single user by id.",

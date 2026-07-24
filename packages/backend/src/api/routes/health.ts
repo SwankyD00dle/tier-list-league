@@ -1,14 +1,9 @@
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import type { db } from "../../database/client";
 import type { BaseHandlerConfig } from "../handler";
 import { defineRoute, type TypedRequest } from "../route-helper";
 
-interface HealthConfig extends BaseHandlerConfig {
-  db: typeof db;
-}
-
-export const healthCheck = (config: HealthConfig) =>
+export const healthCheck = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
     summary: "Health check",
     description: "Liveness and database connectivity probe.",

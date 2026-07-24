@@ -1,15 +1,10 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import type { db } from "../../../database/client";
 import tierList from "../../../database/schema/tier-list";
 import type { BaseHandlerConfig } from "../../handler";
 import { defineRoute, type TypedRequest } from "../../route-helper";
 
-interface GetTierListConfig extends BaseHandlerConfig {
-  db: typeof db;
-}
-
-export const getTierList = (config: GetTierListConfig) =>
+export const getTierList = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
     summary: "Get tier list",
     description: "Get a single tier list by id.",

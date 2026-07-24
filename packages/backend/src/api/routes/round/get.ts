@@ -1,15 +1,10 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import type { db } from "../../../database/client";
 import round from "../../../database/schema/round";
 import type { BaseHandlerConfig } from "../../handler";
 import { defineRoute, type TypedRequest } from "../../route-helper";
 
-interface GetRoundConfig extends BaseHandlerConfig {
-  db: typeof db;
-}
-
-export const getRound = (config: GetRoundConfig) =>
+export const getRound = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
     summary: "Get round",
     description: "Get a single round by id.",

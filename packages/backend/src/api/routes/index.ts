@@ -1,5 +1,4 @@
-import type { db } from "../../database/client";
-import type { Logger } from "../handler";
+import type { BaseHandlerConfig } from "../handler";
 import type { RegisteredRoute } from "../router";
 import { getGame } from "./game/get";
 import { listGames } from "./game/list";
@@ -10,12 +9,7 @@ import { createUser } from "./user/create";
 import { getUser } from "./user/get";
 import { listUsers } from "./user/list";
 
-export interface RouterConfig {
-  log: Logger;
-  db: typeof db;
-}
-
-export function buildRoutes(config: RouterConfig): RegisteredRoute[] {
+export function buildRoutes(config: BaseHandlerConfig): RegisteredRoute[] {
   return [
     { method: "GET", path: "/health", definition: healthCheck(config) },
     { method: "GET", path: "/users", definition: listUsers(config) },

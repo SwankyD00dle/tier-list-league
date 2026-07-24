@@ -1,14 +1,9 @@
 import { z } from "zod";
-import type { db } from "../../../database/client";
 import game from "../../../database/schema/game";
 import type { BaseHandlerConfig } from "../../handler";
 import { defineRoute, type TypedRequest } from "../../route-helper";
 
-interface ListGamesConfig extends BaseHandlerConfig {
-  db: typeof db;
-}
-
-export const listGames = (config: ListGamesConfig) =>
+export const listGames = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
     summary: "List games",
     description: "List all games.",
