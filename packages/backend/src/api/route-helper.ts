@@ -1,62 +1,73 @@
-import type { z } from "zod";
-import { z as zod } from "zod";
+import type { infer as ZodInfer, ZodMiniType } from "zod/mini";
+import * as z from "zod/mini";
 
-export const apiErrorResponseSchema = zod.object({
-  ok: zod.literal(false),
-  code: zod.string(),
-  message: zod.string(),
-  details: zod.object({ unknown: zod.unknown() }),
+export const REQUEST_SCHEMA_FAILURE_CODE = "REQUEST_SCHEMA_VALIDATION_FAILURE";
+export const REQUEST_SCHEMA_FAILURE_MESSAGE = "Request schema validation failed";
+
+export const apiRequestSchema = z.object({
+  params: z.optional(z.record(z.string(), z.string())),
+  query: z.optional(z.record(z.string(), z.union([z.string(), z.array(z.string())]))),
+  body: z.optional(z.unknown()),
 });
 
-export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
+export type ApiRequest = ZodInfer<typeof apiRequestSchema>;
 
-export interface TypedRequest {
-  body?: unknown;
-  params?: Record<string, string>;
-  query?: Record<string, string | string[] | undefined>;
-}
+export const apiSuccessResponseSchema = z.object({
+  ok: z.literal(true),
+});
 
-export interface TypedResponse {
-  status(code: number): TypedResponse;
-  json(body: unknown): TypedResponse;
-}
+export type ApiSuccessResponse = ZodInfer<typeof apiSuccessResponseSchema>;
 
-export type RouteHandler = (
-  req: TypedRequest,
-  res: TypedResponse,
-) => void | Promise<TypedResponse> | Promise<void>;
+export const apiErrorResponseSchema = z.object({
+  ok: z.literal(false),
+  code: z.string(),
+  message: z.string(),
+  details: z.optional(z.unknown()),
+});
 
-export interface DefineRouteOptions<TBody extends z.ZodType | undefined = undefined> {
-  body?: TBody extends z.ZodType ? { schema: TBody; skipValidation?: boolean } : undefined;
+export type ApiErrorResponse = ZodInfer<typeof apiErrorResponseSchema>;
+
+export type ApiResponse<TSuccess> = {
+  status(code: number): ApiResponse<TSuccess>;
+  json(body: TSuccess | ApiErrorResponse): ApiResponse<TSuccess>;
+};
+
+export type RouteHandler<TResponse extends ZodMiniType> = (
+  req: ApiRequest,
+  res: ApiResponse<ZodInfer<TResponse>>,
+) => undefined | Promise<unknown>;
+
+export interface DefineRouteOptions<TRequest extends ZodMiniType, TResponse extends ZodMiniType> {
   summary: string;
   description: string;
   tags: string[];
-  response: z.ZodType;
-  successStatusCode?: number;
-  handler: RouteHandler;
+  request: TRequest;
+  response: TResponse;
+  handler: RouteHandler<TResponse>;
 }
 
-export interface DefinedRoute {
+export interface DefinedRoute<
+  TRequest extends ZodMiniType = ZodMiniType,
+  TResponse extends ZodMiniType = ZodMiniType,
+> {
   summary: string;
   description: string;
   tags: string[];
-  body?: { schema: z.ZodType; skipValidation?: boolean };
-  response: z.ZodType;
-  successStatusCode: number;
-  handler: RouteHandler;
+  request: TRequest;
+  response: TResponse;
+  handler: RouteHandler<TResponse>;
 }
 
-export function defineRoute(
+export function defineRoute<TRequest extends ZodMiniType, TResponse extends ZodMiniType>(
   _log: unknown,
-  options: DefineRouteOptions<z.ZodType | undefined>,
-): DefinedRoute {
+  options: DefineRouteOptions<TRequest, TResponse>,
+): DefinedRoute<TRequest, TResponse> {
   return {
     summary: options.summary,
     description: options.description,
     tags: options.tags,
-    body: options.body,
+    request: options.request,
     response: options.response,
-    successStatusCode: options.successStatusCode ?? 200,
     handler: options.handler,
   };
 }

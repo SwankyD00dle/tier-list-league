@@ -1,24 +1,65 @@
 import { eq } from "drizzle-orm";
-import { z } from "zod";
+import type { db } from "../../../database/client";
 import user from "../../../database/schema/user";
 import type { BaseHandlerConfig } from "../../handler";
-import { defineRoute, type TypedRequest } from "../../route-helper";
+import {
+  type ApiRequest,
+  type ApiResponse,
+  defineRoute,
+  REQUEST_SCHEMA_FAILURE_CODE,
+  REQUEST_SCHEMA_FAILURE_MESSAGE,
+} from "../../route-helper";
+import { type GetUserResponse, getUserRequestSchema, getUserResponseSchema } from "./schema";
 
 export const getUser = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
     summary: "Get user",
     description: "Get a single user by id.",
     tags: ["User"],
-    response: z.unknown(),
-    handler: async (req: TypedRequest, res) => {
-      const id = req.params?.id;
-      if (!id) {
-        return res.status(400).json({ ok: false, error: "Missing id" });
+    request: getUserRequestSchema,
+    response: getUserResponseSchema,
+    handler: async (req: ApiRequest, res: ApiResponse<GetUserResponse>) => {
+      const parsed = getUserRequestSchema.safeParse(req);
+      if (!parsed.success) {
+        return res.status(400).json({
+          ok: false,
+          code: REQUEST_SCHEMA_FAILURE_CODE,
+          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
+        });
       }
-      const [found] = await config.db.select().from(user).where(eq(user.id, id)).limit(1);
+
+      const [found] = await getUserFromDb(config.db, parsed.data.params.id);
       if (!found) {
-        return res.status(404).json({ ok: false, error: "User not found" });
+        return res.status(404).json({
+          ok: false,
+          code: "NOT_FOUND",
+          message: "User not found",
+        });
       }
-      return res.status(200).json({ ok: true, user: found });
+
+      return res.status(200).json({
+        ok: true,
+        user: {
+          id: found.id,
+          name: found.name,
+          discordUserId: found.discordUserId,
+          activeGames: found.activeGames,
+          createdAt: found.createdAt.toISOString(),
+        },
+      });
     },
   });
+
+function getUserFromDb(database: typeof db, id: string) {
+  return database
+    .select({
+      id: user.id,
+      name: user.name,
+      discordUserId: user.discordUserId,
+      activeGames: user.activeGames,
+      createdAt: user.createdAt,
+    })
+    .from(user)
+    .where(eq(user.id, id))
+    .limit(1);
+}
