@@ -5,6 +5,6 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/tier_list_league",
+    url: process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5433/tier_list_league",
   },
 });

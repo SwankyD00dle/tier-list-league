@@ -1,0 +1,7 @@
+name: LOCAL
+values:
+  - key: HTTP_VERSION
+    value: ''
+  - key: BASE_URL
+    value: ''
+color: 180
