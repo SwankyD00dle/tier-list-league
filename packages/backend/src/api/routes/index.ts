@@ -2,7 +2,7 @@ import type { BaseHandlerConfig } from "../handler";
 import type { RegisteredRoute } from "../router";
 import { getGame } from "./game/get";
 import { listGames } from "./game/list";
-import { healthCheck } from "./health";
+import { healthCheck } from "./health/get";
 import { getRound } from "./round/get";
 import { getTierList } from "./tier-list/get";
 import { createUser } from "./user/create";

@@ -1,69 +1,52 @@
 import { randomUUID } from "node:crypto";
-import { z } from "zod";
+import type { db } from "../../../database/client";
 import user from "../../../database/schema/user";
 import type { BaseHandlerConfig } from "../../handler";
-import { apiErrorResponseSchema, defineRoute, type TypedRequest } from "../../route-helper";
-
-const createUserBodySchema = z.object({
-  name: z.string().min(1).max(100).describe("Display name for the user"),
-  discordUserId: z.string().min(1).max(100).describe("Discord snowflake ID for the user"),
-  games: z.array(z.string()).describe("Game IDs the user is participating in"),
-});
-
-export type CreateUserRequest = z.infer<typeof createUserBodySchema>;
-
-const createUserSuccessSchema = z.object({
-  ok: z.literal(true),
-  id: z.string().uuid(),
-  name: z.string(),
-  discordUserId: z.string(),
-  createdAt: z.string(),
-});
-
-const createUserResponseSchema = z.discriminatedUnion("ok", [
-  createUserSuccessSchema,
-  apiErrorResponseSchema,
-]);
-
-export type CreateUserResponse = z.infer<typeof createUserResponseSchema>;
+import {
+  type ApiRequest,
+  type ApiResponse,
+  defineRoute,
+  REQUEST_SCHEMA_FAILURE_CODE,
+  REQUEST_SCHEMA_FAILURE_MESSAGE,
+} from "../../route-helper";
+import {
+  type CreateUserResponse,
+  createUserRequestSchema,
+  createUserResponseSchema,
+} from "./schema";
 
 export const createUser = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
-    body: { schema: createUserBodySchema, skipValidation: true },
     summary: "Create user",
     description: "Create a new user.",
     tags: ["User"],
+    request: createUserRequestSchema,
     response: createUserResponseSchema,
-    successStatusCode: 201,
-    handler: async (req: TypedRequest, res) => {
-      const { log, db } = config;
+    handler: async (req: ApiRequest, res: ApiResponse<CreateUserResponse>) => {
+      const { log } = config;
 
       try {
-        const validationResult = createUserBodySchema.safeParse(req.body);
-
-        if (!validationResult.success) {
+        const parsed = createUserRequestSchema.safeParse(req);
+        if (!parsed.success) {
           return res.status(400).json({
             ok: false,
-            error: validationResult.error.issues[0]?.message ?? "Invalid request body",
+            code: REQUEST_SCHEMA_FAILURE_CODE,
+            message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
           });
         }
 
-        const { name, discordUserId } = validationResult.data;
-        const id = randomUUID();
-
-        const [created] = await db
-          .insert(user)
-          .values({
-            id,
-            name,
-            discordUserId,
-          })
-          .returning();
+        const { name, discordUserId } = parsed.data.body;
+        const [created] = await createUserInDb(config.db, {
+          id: randomUUID(),
+          name,
+          discordUserId,
+        });
 
         if (!created) {
           return res.status(500).json({
             ok: false,
-            error: "Failed to create user",
+            code: "INTERNAL_ERROR",
+            message: "Failed to create user",
           });
         }
 
@@ -75,21 +58,32 @@ export const createUser = (config: BaseHandlerConfig) =>
           "Created user",
         );
 
-        const resp: CreateUserResponse = {
+        return res.status(201).json({
           ok: true,
           id: created.id,
           name: created.name,
           discordUserId: created.discordUserId,
           createdAt: created.createdAt.toISOString(),
-        };
-
-        return res.status(201).json(resp);
+        });
       } catch (error) {
         log.error({ error: String(error) }, "Create user error");
         return res.status(500).json({
           ok: false,
-          error: "Failed to create user",
+          code: "INTERNAL_ERROR",
+          message: "Failed to create user",
         });
       }
     },
   });
+
+function createUserInDb(
+  database: typeof db,
+  values: { id: string; name: string; discordUserId: string },
+) {
+  return database.insert(user).values(values).returning({
+    id: user.id,
+    name: user.name,
+    discordUserId: user.discordUserId,
+    createdAt: user.createdAt,
+  });
+}

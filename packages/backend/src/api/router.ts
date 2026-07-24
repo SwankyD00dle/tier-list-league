@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { DefinedRoute, TypedRequest, TypedResponse } from "./route-helper";
+import type { ApiRequest, ApiResponse, DefinedRoute } from "./route-helper";
 
 export interface RegisteredRoute {
   method: string;
@@ -56,21 +56,21 @@ export function createRouter(routes: RegisteredRoute[]) {
     const pathname = url.pathname;
 
     const pending = { status: 200 };
-    const typedRes: TypedResponse = {
+    const reply: ApiResponse<unknown> = {
       status(code) {
         pending.status = code;
-        return typedRes;
+        return reply;
       },
       json(body) {
         res.writeHead(pending.status, { "content-type": "application/json" });
         res.end(JSON.stringify(body));
-        return typedRes;
+        return reply;
       },
     };
 
     const match = compiled.find((route) => route.method === method && route.regex.test(pathname));
     if (!match) {
-      typedRes.status(404).json({ ok: false, error: "Not found" });
+      reply.status(404).json({ ok: false, code: "NOT_FOUND", message: "Not found" });
       return;
     }
 
@@ -85,10 +85,10 @@ export function createRouter(routes: RegisteredRoute[]) {
       });
     }
 
-    const query: Record<string, string | string[] | undefined> = {};
+    const query: Record<string, string | string[]> = {};
     for (const key of url.searchParams.keys()) {
       const values = url.searchParams.getAll(key);
-      query[key] = values.length > 1 ? values : values[0];
+      query[key] = values.length > 1 ? values : (values[0] ?? "");
     }
 
     let body: unknown;
@@ -96,30 +96,24 @@ export function createRouter(routes: RegisteredRoute[]) {
       try {
         body = await readBody(req);
       } catch {
-        typedRes.status(400).json({ ok: false, error: "Invalid JSON body" });
+        reply.status(400).json({ ok: false, code: "INVALID_JSON", message: "Invalid JSON body" });
         return;
       }
     }
 
-    const bodySpec = match.definition.body;
-    if (bodySpec?.schema && !bodySpec.skipValidation) {
-      const parsed = bodySpec.schema.safeParse(body);
-      if (!parsed.success) {
-        typedRes
-          .status(400)
-          .json({ ok: false, error: parsed.error.issues[0]?.message ?? "Invalid request body" });
-        return;
-      }
-      body = parsed.data;
-    }
-
-    const typedReq: TypedRequest = { body, params, query };
+    const routeReq: ApiRequest = { body, params, query };
     try {
-      await match.definition.handler(typedReq, typedRes);
+      await match.definition.handler(routeReq, reply);
     } catch {
       if (!res.headersSent) {
         res.writeHead(500, { "content-type": "application/json" });
-        res.end(JSON.stringify({ ok: false, error: "Internal server error" }));
+        res.end(
+          JSON.stringify({
+            ok: false,
+            code: "INTERNAL_ERROR",
+            message: "Internal server error",
+          }),
+        );
       }
     }
   };
