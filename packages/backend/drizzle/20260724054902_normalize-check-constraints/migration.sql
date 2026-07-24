@@ -1,0 +1,3 @@
+ALTER TABLE "game" DROP CONSTRAINT "round_count_positive", ADD CONSTRAINT "round_count_positive" CHECK ("round_count" > 0);--> statement-breakpoint
+ALTER TABLE "guess" DROP CONSTRAINT "guess_data_not_empty", ADD CONSTRAINT "guess_data_not_empty" CHECK ("guess_data" != '');--> statement-breakpoint
+ALTER TABLE "round" DROP CONSTRAINT "round_count_positive", ADD CONSTRAINT "round_count_positive" CHECK ("round_number" > 0);
