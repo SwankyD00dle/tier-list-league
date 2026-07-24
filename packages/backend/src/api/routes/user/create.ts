@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import type { db } from "../../../database/client";
 import user from "../../../database/schema/user";
 import type { BaseHandlerConfig } from "../../handler";
 import { apiErrorResponseSchema, defineRoute, type TypedRequest } from "../../route-helper";
@@ -28,11 +27,7 @@ const createUserResponseSchema = z.discriminatedUnion("ok", [
 
 export type CreateUserResponse = z.infer<typeof createUserResponseSchema>;
 
-interface CreateUserConfig extends BaseHandlerConfig {
-  db: typeof db;
-}
-
-export const createUser = (config: CreateUserConfig) =>
+export const createUser = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
     body: { schema: createUserBodySchema, skipValidation: true },
     summary: "Create user",

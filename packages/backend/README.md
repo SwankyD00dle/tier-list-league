@@ -33,3 +33,26 @@ npm run db:migrate  --workspace @tier-list-league/backend   # apply to DATABASE_
 - `dev` / `start` — run the server with tsx.
 - `typecheck` — type-check with TypeScript 7 (`tsc-native`).
 - `db:generate` / `db:migrate` / `db:push` / `db:studio` — Drizzle Kit.
+
+## HTTP API
+
+The server (`npm run start`) mounts routes through a small router over `node:http`. Routes are defined with `defineRoute` under `src/api/routes/` and registered in `src/api/routes/index.ts`.
+
+| Method | Path              | Description            |
+| ------ | ----------------- | ---------------------- |
+| GET    | `/health`         | Liveness + DB probe    |
+| GET    | `/users`          | List users             |
+| POST   | `/users`          | Create a user          |
+| GET    | `/users/:id`      | Get a user by id       |
+| GET    | `/games`          | List games             |
+| GET    | `/games/:id`      | Get a game by id       |
+| GET    | `/rounds/:id`     | Get a round by id      |
+| GET    | `/tier-lists/:id` | Get a tier list by id  |
+
+Example:
+
+```bash
+curl localhost:3001/users
+curl -X POST localhost:3001/users -H 'content-type: application/json' \
+  -d '{"name":"Ryan","discordUserId":"123","games":[]}'
+```
