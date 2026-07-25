@@ -2,19 +2,23 @@
 
 Next.js (App Router) + React + Tailwind CSS.
 
-## Develop
+## Develop the full app
+
+From the repository root:
 
 ```bash
 nvm use
-npm install          # run from the repo root
-npm run dev --workspace @tier-list-league/frontend
+npm install
+npm run dev
 ```
 
-Open http://localhost:3000.
+Open http://localhost:3000. Next.js serves the frontend and proxies `/api/*` to the backend, so frontend code should use relative URLs such as `fetch("/api/users")`.
+
+`BACKEND_URL` controls the internal proxy destination and defaults to `http://localhost:3001`. See `.env.example`.
 
 ## Scripts
 
-- `dev` — start the Next dev server.
+- `dev` — start only the Next dev server.
 - `build` / `start` — production build and serve.
 - `typecheck` — type-check with TypeScript 7 (`tsc-native`).
 
