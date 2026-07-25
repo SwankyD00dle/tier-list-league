@@ -49,3 +49,41 @@ export const getRoundResponseSchema = z.extend(apiSuccessResponseSchema, {
 });
 
 export type GetRoundResponse = ZodInfer<typeof getRoundResponseSchema>;
+
+export const createRoundRequestSchema = z.extend(apiRequestSchema, {
+  params: z.object({
+    gameId: z.uuid(),
+  }),
+  body: z.object({
+    topic: z.string().check(z.minLength(1), z.maxLength(500)),
+    hostedBy: z.uuid(),
+    endsAt: z.optional(z.iso.datetime()),
+  }),
+});
+
+export type CreateRoundRequest = ZodInfer<typeof createRoundRequestSchema>;
+
+export const createRoundResponseSchema = z.extend(apiSuccessResponseSchema, {
+  round: roundSchema,
+});
+
+export type CreateRoundResponse = ZodInfer<typeof createRoundResponseSchema>;
+
+export const updateRoundRequestSchema = z.extend(apiRequestSchema, {
+  params: z.object({
+    id: z.uuid(),
+  }),
+  body: z.object({
+    topic: z.optional(z.string().check(z.minLength(1), z.maxLength(500))),
+    hostedBy: z.optional(z.uuid()),
+    endsAt: z.optional(z.nullable(z.iso.datetime())),
+  }),
+});
+
+export type UpdateRoundRequest = ZodInfer<typeof updateRoundRequestSchema>;
+
+export const updateRoundResponseSchema = z.extend(apiSuccessResponseSchema, {
+  round: roundSchema,
+});
+
+export type UpdateRoundResponse = ZodInfer<typeof updateRoundResponseSchema>;

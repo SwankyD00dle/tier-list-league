@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "guess_round_user_unique" ON "guess" ("round_id","user_id");

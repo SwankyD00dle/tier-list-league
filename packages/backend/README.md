@@ -59,11 +59,19 @@ Routes are defined under `src/api/routes/` and registered in `src/api/routes/ind
 | POST   | `/api/users`               | Create a user         |
 | GET    | `/api/users/:id`           | Get a user by id      |
 | GET    | `/api/games`               | List games            |
+| POST   | `/api/games`               | Create a game         |
 | GET    | `/api/games/:id`           | Get a game by id      |
+| PATCH  | `/api/games/:id`           | Update a game         |
+| POST   | `/api/games/:gameId/participants` | Add a participant |
+| DELETE | `/api/games/:gameId/participants/:userId` | Remove a participant |
+| POST   | `/api/games/:gameId/rounds` | Create the next round |
 | POST   | `/api/games/:gameId/score` | Record round scores   |
 | GET    | `/api/games/:gameId/score` | Get the scoreboard    |
 | GET    | `/api/games/:gameId/score/:userId` | Get a player's score |
 | GET    | `/api/rounds/:id`          | Get a round by id     |
+| PATCH  | `/api/rounds/:id`          | Update an unfinalized round |
+| POST   | `/api/rounds/:roundId/guesses` | Submit or replace a guess |
+| POST   | `/api/rounds/:roundId/tier-lists` | Submit or update a tier list |
 | GET    | `/api/tier-lists/:id`      | Get a tier list by id |
 
 Examples through the shared port:
@@ -104,6 +112,14 @@ The POST body identifies the round, its recorded host, the winning guess, and ho
 
 Score reads are keyed by user ID. Each player has a running `total` and only rounds where they scored. A round contains its summed `score` and an `entries` array because one player can receive multiple awards in the same round. Reposting a round replaces that round's prior entries atomically, so retries and corrections do not double-score.
 
+### Gameplay mutations
+
+- Creating a game enrolls the creator plus any listed participants and keeps each user's `activeGames` in sync; participant add/remove does the same.
+- `POST /api/games/:gameId/rounds` assigns the next round number and links the round to the game; the host must be a participant.
+- Rounds are finalized through `POST /api/games/:gameId/score`; a finalized round rejects further round updates, guesses, and tier lists with `409 ROUND_FINALIZED`.
+- Guess and tier-list submissions upsert: resubmitting replaces that user's previous entry (`201` on create, `200` on replace). One guess per user per round is DB-enforced.
+- A tier-list submission from the round host becomes the round's canonical `tierList`; other participants land in `participantTierLists`.
+
 ### Remaining UI API gaps
 
-The current API can read users, games, rounds, tier lists, and scores, and can create users. A complete game UI still needs mutation endpoints for games/participants, rounds, guesses, and participant tier lists, plus authentication so the server can verify the caller is the recorded host. A composite game-state endpoint may also be useful if the UI otherwise needs several requests to render one game screen.
+Authentication is the main gap: user IDs in request bodies are validated as invariants, but the server cannot yet verify the caller's identity. A composite game-state endpoint may also be useful if the UI otherwise needs several requests to render one game screen.
