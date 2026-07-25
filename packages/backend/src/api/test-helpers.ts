@@ -34,10 +34,12 @@ export function createMockDb(options?: {
   selectResult?: unknown[];
   selectResults?: unknown[][];
   insertResult?: unknown[];
+  updateResult?: unknown[];
   executeError?: Error;
 }): typeof db {
   const selectResults = [...(options?.selectResults ?? [options?.selectResult ?? []])];
   const insertResult = options?.insertResult ?? [];
+  const updateResult = options?.updateResult ?? [];
 
   const createSelectChain = (selectResult: unknown[]) => {
     const promise = Promise.resolve(selectResult);
@@ -59,7 +61,11 @@ export function createMockDb(options?: {
     })),
     update: vi.fn(() => ({
       set: vi.fn(() => ({
-        where: vi.fn(() => Promise.resolve()),
+        where: vi.fn(() =>
+          Object.assign(Promise.resolve(), {
+            returning: () => Promise.resolve(updateResult),
+          }),
+        ),
       })),
     })),
     delete: vi.fn(() => ({
