@@ -32,33 +32,48 @@ export function createMockResponse<TSuccess>() {
 
 export function createMockDb(options?: {
   selectResult?: unknown[];
+  selectResults?: unknown[][];
   insertResult?: unknown[];
   executeError?: Error;
 }): typeof db {
-  const selectResult = options?.selectResult ?? [];
+  const selectResults = [...(options?.selectResults ?? [options?.selectResult ?? []])];
   const insertResult = options?.insertResult ?? [];
 
-  const createSelectChain = () => {
+  const createSelectChain = (selectResult: unknown[]) => {
     const promise = Promise.resolve(selectResult);
     return Object.assign(promise, {
-      where: () => createSelectChain(),
+      where: () => createSelectChain(selectResult),
       limit: () => promise,
+      orderBy: () => promise,
     });
   };
 
-  return {
+  const database = {
     select: vi.fn(() => ({
-      from: vi.fn(() => createSelectChain()),
+      from: vi.fn(() => createSelectChain(selectResults.shift() ?? [])),
     })),
     insert: vi.fn(() => ({
       values: vi.fn(() => ({
         returning: vi.fn(() => Promise.resolve(insertResult)),
       })),
     })),
+    update: vi.fn(() => ({
+      set: vi.fn(() => ({
+        where: vi.fn(() => Promise.resolve()),
+      })),
+    })),
+    delete: vi.fn(() => ({
+      where: vi.fn(() => Promise.resolve()),
+    })),
     execute: vi.fn(() =>
       options?.executeError ? Promise.reject(options.executeError) : Promise.resolve(undefined),
     ),
-  } as unknown as typeof db;
+    transaction: vi.fn(async (callback: (transaction: typeof db) => Promise<unknown>) =>
+      callback(database as unknown as typeof db),
+    ),
+  };
+
+  return database as unknown as typeof db;
 }
 
 export function createMockConfig(

@@ -12,6 +12,24 @@ export const roundSchema = z.object({
   guesses: z.array(z.uuid()),
   winningGuess: z.nullable(z.uuid()),
   honorableMentions: z.nullable(z.array(z.uuid())),
+  honorableMentionDetails: z.array(
+    z.object({
+      guessId: z.uuid(),
+      title: z.string(),
+    }),
+  ),
+  scoreDeltas: z.record(
+    z.uuid(),
+    z.object({
+      score: z.number().check(z.int(), z.positive()),
+      entries: z.array(
+        z.object({
+          score: z.number().check(z.int(), z.positive()),
+          reason: z.string(),
+        }),
+      ),
+    }),
+  ),
   participantTierLists: z.nullable(z.array(z.uuid())),
   createdAt: z.iso.datetime(),
   updatedAt: z.nullable(z.iso.datetime()),
