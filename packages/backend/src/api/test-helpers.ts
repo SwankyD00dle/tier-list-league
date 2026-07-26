@@ -11,14 +11,58 @@ export function createMockLogger(): Logger {
 }
 
 export function createMockResponse<TSuccess>() {
-  const state: { statusCode: number; body: unknown } = {
+  const state: {
+    statusCode: number;
+    body: unknown;
+    headers: Record<string, string>;
+    cookies: string[];
+    redirectUrl: string | undefined;
+  } = {
     statusCode: 200,
     body: undefined,
+    headers: {},
+    cookies: [],
+    redirectUrl: undefined,
   };
 
   const res: ApiResponse<TSuccess> = {
     status(code) {
       state.statusCode = code;
+      return res;
+    },
+    setHeader(name, value) {
+      state.headers[name.toLowerCase()] = value;
+      return res;
+    },
+    setCookie(name, value, options) {
+      const parts = [`${name}=${encodeURIComponent(value)}`];
+      if (options?.maxAge !== undefined) {
+        parts.push(`Max-Age=${options.maxAge}`);
+      }
+      if (options?.path) {
+        parts.push(`Path=${options.path}`);
+      }
+      if (options?.httpOnly) {
+        parts.push("HttpOnly");
+      }
+      if (options?.secure) {
+        parts.push("Secure");
+      }
+      if (options?.sameSite) {
+        parts.push(`SameSite=${options.sameSite}`);
+      }
+      state.cookies.push(parts.join("; "));
+      return res;
+    },
+    clearCookie(name, options) {
+      return res.setCookie(name, "", { ...options, maxAge: 0 });
+    },
+    redirect(url) {
+      if (state.statusCode === 200) {
+        state.statusCode = 302;
+      }
+      state.redirectUrl = url;
+      state.headers.location = url;
       return res;
     },
     json(body) {

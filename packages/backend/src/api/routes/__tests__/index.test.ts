@@ -14,6 +14,11 @@ describe("buildRoutes", () => {
 
     expect(routes.map(({ method, path }) => `${method} ${path}`)).toEqual([
       "GET /api/health",
+      "GET /api/auth/discord",
+      "GET /api/auth/discord/callback",
+      "POST /api/auth/refresh",
+      "POST /api/auth/logout",
+      "GET /api/auth/me",
       "GET /api/users",
       "POST /api/users",
       "GET /api/users/:id",

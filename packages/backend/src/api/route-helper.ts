@@ -12,6 +12,10 @@ export const REQUEST_SCHEMA_FAILURE_MESSAGE = "Request schema validation failed"
 
 export type ApiResponse<TSuccess> = {
   status(code: number): ApiResponse<TSuccess>;
+  setHeader(name: string, value: string): ApiResponse<TSuccess>;
+  setCookie(name: string, value: string, options?: CookieOptions): ApiResponse<TSuccess>;
+  clearCookie(name: string, options?: CookieOptions): ApiResponse<TSuccess>;
+  redirect(url: string): ApiResponse<TSuccess>;
   json(body: TSuccess | ApiErrorResponse): ApiResponse<TSuccess>;
 };
 
