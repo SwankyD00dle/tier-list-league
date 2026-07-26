@@ -1,9 +1,19 @@
+import {
+  isMeRequest,
+  type MeResponse,
+  meRequestSchema,
+  meResponseSchema,
+} from "@tier-list-league/api-schema";
 import { eq } from "drizzle-orm";
 import user from "../../../database/schema/user";
 import { requireAuth } from "../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../handler";
-import { type ApiRequest, type ApiResponse, defineRoute } from "../../route-helper";
-import { type MeResponse, meRequestSchema, meResponseSchema } from "./schema";
+import {
+  type ApiRequest,
+  type ApiResponse,
+  defineRoute,
+  requestSchemaFailure,
+} from "../../route-helper";
 
 export const getMe = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -15,17 +25,12 @@ export const getMe = (config: BaseHandlerConfig) =>
     handler: async (req: ApiRequest, res: ApiResponse<MeResponse>) => {
       const { log } = config;
 
-      const parsedRequest = meRequestSchema.safeParse(req);
-      if (!parsedRequest.success) {
-        return res.status(400).json({
-          ok: false,
-          code: "INVALID_REQUEST",
-          message: "Invalid request",
-        });
+      if (!isMeRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
       try {
-        const auth = await requireAuth(parsedRequest.data, res);
+        const auth = await requireAuth(req, res);
         if (!auth) {
           return;
         }

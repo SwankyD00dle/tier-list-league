@@ -1,5 +1,16 @@
 export type { ApiErrorResponse, ApiRequest, ApiSuccessResponse } from "./api-schema";
 export type {
+  AuthRedirectResponse,
+  DiscordCallbackRequest,
+  LogoutRequest,
+  LogoutResponse,
+  MeRequest,
+  MeResponse,
+  RefreshAuthRequest,
+  RefreshAuthResponse,
+  StartDiscordAuthRequest,
+} from "./auth-schema";
+export type {
   AddParticipantRequest,
   ParticipantsResponse,
   RemoveParticipantRequest,

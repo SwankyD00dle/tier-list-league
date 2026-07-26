@@ -1,4 +1,10 @@
 import { randomUUID } from "node:crypto";
+import {
+  type AuthRedirectResponse,
+  authRedirectResponseSchema,
+  discordCallbackRequestSchema,
+  isDiscordCallbackRequest,
+} from "@tier-list-league/api-schema";
 import { eq } from "drizzle-orm";
 import type { db } from "../../../database/client";
 import user from "../../../database/schema/user";
@@ -17,15 +23,9 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../route-helper";
 import { getAuthConfig } from "./config";
-import {
-  type AuthRedirectResponse,
-  authRedirectResponseSchema,
-  discordCallbackRequestSchema,
-} from "./schema";
 
 export const discordCallback = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -39,16 +39,11 @@ export const discordCallback = (config: BaseHandlerConfig) =>
       const { frontendUrl, accessTokenTtlSeconds, refreshTokenTtlSeconds } = getAuthConfig();
 
       try {
-        const parsed = discordCallbackRequestSchema.safeParse(req);
-        if (!parsed.success) {
-          return res.status(400).json({
-            ok: false,
-            code: REQUEST_SCHEMA_FAILURE_CODE,
-            message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-          });
+        if (!isDiscordCallbackRequest(req)) {
+          return requestSchemaFailure(res);
         }
 
-        const { code, state, error } = parsed.data.query ?? {};
+        const { code, state, error } = req.query;
         if (error !== undefined) {
           log.error({ error }, "Discord OAuth error");
           return res.redirect(`${frontendUrl}/?authError=discord`);

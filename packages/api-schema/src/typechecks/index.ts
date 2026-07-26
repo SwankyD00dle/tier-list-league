@@ -1,4 +1,5 @@
 export * from "./api-typechecks";
+export * from "./auth-typechecks";
 export * from "./game-participants-typechecks";
 export * from "./game-score-typechecks";
 export * from "./game-typechecks";

@@ -10,6 +10,15 @@ export type {
 export const REQUEST_SCHEMA_FAILURE_CODE = "REQUEST_SCHEMA_VALIDATION_FAILURE";
 export const REQUEST_SCHEMA_FAILURE_MESSAGE = "Request schema validation failed";
 
+export interface CookieOptions {
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: "Strict" | "Lax" | "None";
+  path?: string;
+  maxAge?: number;
+  expires?: Date;
+}
+
 export type ApiResponse<TSuccess> = {
   status(code: number): ApiResponse<TSuccess>;
   setHeader(name: string, value: string): ApiResponse<TSuccess>;
@@ -45,7 +54,6 @@ export interface DefinedRoute<
   handler: RouteHandler<TResponse>;
 }
 
-/** Rejects a request that failed its schema typecheck. */
 export function requestSchemaFailure<TSuccess>(res: ApiResponse<TSuccess>) {
   return res.status(400).json({
     ok: false,

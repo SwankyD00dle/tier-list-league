@@ -1,13 +1,13 @@
 import { randomBytes } from "node:crypto";
-import { authCookieOptions, OAUTH_STATE_COOKIE } from "../../auth/cookies";
-import { buildDiscordAuthorizeUrl } from "../../auth/discord";
-import type { BaseHandlerConfig } from "../../handler";
-import { type ApiRequest, type ApiResponse, defineRoute } from "../../route-helper";
 import {
   type AuthRedirectResponse,
   authRedirectResponseSchema,
   startDiscordAuthRequestSchema,
-} from "./schema";
+} from "@tier-list-league/api-schema";
+import { authCookieOptions, OAUTH_STATE_COOKIE } from "../../auth/cookies";
+import { buildDiscordAuthorizeUrl } from "../../auth/discord";
+import type { BaseHandlerConfig } from "../../handler";
+import { type ApiRequest, type ApiResponse, defineRoute } from "../../route-helper";
 
 const OAUTH_STATE_TTL_SECONDS = 600;
 

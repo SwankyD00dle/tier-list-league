@@ -1,3 +1,8 @@
+import {
+  type RefreshAuthResponse,
+  refreshAuthRequestSchema,
+  refreshAuthResponseSchema,
+} from "@tier-list-league/api-schema";
 import { eq } from "drizzle-orm";
 import user from "../../../database/schema/user";
 import {
@@ -11,11 +16,6 @@ import { parseCookies } from "../../cookie";
 import type { BaseHandlerConfig } from "../../handler";
 import { type ApiRequest, type ApiResponse, defineRoute } from "../../route-helper";
 import { getAuthConfig } from "./config";
-import {
-  type RefreshAuthResponse,
-  refreshAuthRequestSchema,
-  refreshAuthResponseSchema,
-} from "./schema";
 
 export const refreshAuth = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {

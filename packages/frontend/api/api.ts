@@ -16,8 +16,11 @@ import {
   isHealthResponse,
   isListGamesResponse,
   isListUsersResponse,
+  isLogoutResponse,
+  isMeResponse,
   isParticipantsResponse,
   isRecordGameScoreResponse,
+  isRefreshAuthResponse,
   isSubmitGuessResponse,
   isSubmitTierListResponse,
   isUpdateGameResponse,
@@ -44,9 +47,13 @@ export type ApiResult<TData> =
 
 export type TypeCheck<TData> = (data: unknown) => data is TData;
 
-/** Every endpoint the backend serves, in the same order as the backend router. */
 export const routes = {
   health: "/api/health",
+  discordAuth: "/api/auth/discord",
+  discordAuthCallback: "/api/auth/discord/callback",
+  refreshAuth: "/api/auth/refresh",
+  logout: "/api/auth/logout",
+  me: "/api/auth/me",
   users: "/api/users",
   user: (id: string) => `/api/users/${encodeURIComponent(id)}`,
   games: "/api/games",
@@ -74,9 +81,12 @@ export type RecordGameScoreBody = RecordGameScoreRequest["body"];
 export type SubmitGuessBody = SubmitGuessRequest["body"];
 export type SubmitTierListBody = SubmitTierListRequest["body"];
 
-/** Typed client for the backend API. Every response is typechecked before it reaches the caller. */
 export const api = {
   health: () => get(routes.health, isHealthResponse),
+
+  me: () => get(routes.me, isMeResponse),
+  refreshAuth: () => send("POST", routes.refreshAuth, undefined, isRefreshAuthResponse),
+  logout: () => send("POST", routes.logout, undefined, isLogoutResponse),
 
   listUsers: () => get(routes.users, isListUsersResponse),
   getUser: (id: string) => get(routes.user(id), isGetUserResponse),
