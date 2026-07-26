@@ -1,6 +1,6 @@
 import type { infer as ZodInfer } from "zod/mini";
 import * as z from "zod/mini";
-import { apiRequestSchema } from "../../route-helper";
+import { apiRequestSchema } from "./api-schema";
 
 export const healthRequestSchema = apiRequestSchema;
 

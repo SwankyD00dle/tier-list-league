@@ -1,31 +1,14 @@
+import type { ApiErrorResponse, ApiRequest } from "@tier-list-league/api-schema/types";
 import type { infer as ZodInfer, ZodMiniType } from "zod/mini";
-import * as z from "zod/mini";
+
+export type {
+  ApiErrorResponse,
+  ApiRequest,
+  ApiSuccessResponse,
+} from "@tier-list-league/api-schema/types";
 
 export const REQUEST_SCHEMA_FAILURE_CODE = "REQUEST_SCHEMA_VALIDATION_FAILURE";
 export const REQUEST_SCHEMA_FAILURE_MESSAGE = "Request schema validation failed";
-
-export const apiRequestSchema = z.object({
-  params: z.optional(z.record(z.string(), z.string())),
-  query: z.optional(z.record(z.string(), z.union([z.string(), z.array(z.string())]))),
-  body: z.optional(z.unknown()),
-});
-
-export type ApiRequest = ZodInfer<typeof apiRequestSchema>;
-
-export const apiSuccessResponseSchema = z.object({
-  ok: z.literal(true),
-});
-
-export type ApiSuccessResponse = ZodInfer<typeof apiSuccessResponseSchema>;
-
-export const apiErrorResponseSchema = z.object({
-  ok: z.literal(false),
-  code: z.string(),
-  message: z.string(),
-  details: z.optional(z.unknown()),
-});
-
-export type ApiErrorResponse = ZodInfer<typeof apiErrorResponseSchema>;
 
 export type ApiResponse<TSuccess> = {
   status(code: number): ApiResponse<TSuccess>;
@@ -56,6 +39,15 @@ export interface DefinedRoute<
   request: TRequest;
   response: TResponse;
   handler: RouteHandler<TResponse>;
+}
+
+/** Rejects a request that failed its schema typecheck. */
+export function requestSchemaFailure<TSuccess>(res: ApiResponse<TSuccess>) {
+  return res.status(400).json({
+    ok: false,
+    code: REQUEST_SCHEMA_FAILURE_CODE,
+    message: REQUEST_SCHEMA_FAILURE_MESSAGE,
+  });
 }
 
 export function defineRoute<TRequest extends ZodMiniType, TResponse extends ZodMiniType>(

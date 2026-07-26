@@ -1,3 +1,9 @@
+import {
+  type GetGameResponse,
+  getGameRequestSchema,
+  getGameResponseSchema,
+  isGetGameRequest,
+} from "@tier-list-league/api-schema";
 import { eq } from "drizzle-orm";
 import type { db } from "../../../database/client";
 import game from "../../../database/schema/game";
@@ -6,10 +12,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../route-helper";
-import { type GetGameResponse, getGameRequestSchema, getGameResponseSchema } from "./schema";
 
 export const getGame = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -19,16 +23,11 @@ export const getGame = (config: BaseHandlerConfig) =>
     request: getGameRequestSchema,
     response: getGameResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<GetGameResponse>) => {
-      const parsed = getGameRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          code: REQUEST_SCHEMA_FAILURE_CODE,
-          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-        });
+      if (!isGetGameRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
-      const [found] = await getGameFromDb(config.db, parsed.data.params.id);
+      const [found] = await getGameFromDb(config.db, req.params.id);
       if (!found) {
         return res.status(404).json({
           ok: false,

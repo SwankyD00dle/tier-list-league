@@ -1,3 +1,9 @@
+import {
+  isRecordGameScoreRequest,
+  type RecordGameScoreResponse,
+  recordGameScoreRequestSchema,
+  recordGameScoreResponseSchema,
+} from "@tier-list-league/api-schema";
 import { and, eq, inArray } from "drizzle-orm";
 import game from "../../../../database/schema/game";
 import guess from "../../../../database/schema/guess";
@@ -8,14 +14,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../../route-helper";
-import {
-  type RecordGameScoreResponse,
-  recordGameScoreRequestSchema,
-  recordGameScoreResponseSchema,
-} from "./schema";
 import { aggregateGameScores, aggregateRoundScoreDeltas, buildRoundScoreEntries } from "./service";
 
 export const recordGameScore = (config: BaseHandlerConfig) =>
@@ -26,17 +26,12 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
     request: recordGameScoreRequestSchema,
     response: recordGameScoreResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<RecordGameScoreResponse>) => {
-      const parsed = recordGameScoreRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          code: REQUEST_SCHEMA_FAILURE_CODE,
-          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-        });
+      if (!isRecordGameScoreRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
-      const { gameId } = parsed.data.params;
-      const input = parsed.data.body.round;
+      const { gameId } = req.params;
+      const input = req.body.round;
       const awardedGuessIds = [
         input.winningGuess,
         ...input.honorableMentions.map(({ guessId }) => guessId),

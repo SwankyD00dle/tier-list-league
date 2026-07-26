@@ -1,3 +1,9 @@
+import {
+  type GetRoundResponse,
+  getRoundRequestSchema,
+  getRoundResponseSchema,
+  isGetRoundRequest,
+} from "@tier-list-league/api-schema";
 import { eq } from "drizzle-orm";
 import type { db } from "../../../database/client";
 import round from "../../../database/schema/round";
@@ -6,10 +12,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../route-helper";
-import { type GetRoundResponse, getRoundRequestSchema, getRoundResponseSchema } from "./schema";
 
 export const getRound = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -19,16 +23,11 @@ export const getRound = (config: BaseHandlerConfig) =>
     request: getRoundRequestSchema,
     response: getRoundResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<GetRoundResponse>) => {
-      const parsed = getRoundRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          code: REQUEST_SCHEMA_FAILURE_CODE,
-          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-        });
+      if (!isGetRoundRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
-      const [found] = await getRoundFromDb(config.db, parsed.data.params.id);
+      const [found] = await getRoundFromDb(config.db, req.params.id);
       if (!found) {
         return res.status(404).json({
           ok: false,

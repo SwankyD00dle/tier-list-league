@@ -1,4 +1,10 @@
 import { randomUUID } from "node:crypto";
+import {
+  type CreateGameResponse,
+  createGameRequestSchema,
+  createGameResponseSchema,
+  isCreateGameRequest,
+} from "@tier-list-league/api-schema";
 import { inArray, sql } from "drizzle-orm";
 import game from "../../../database/schema/game";
 import user from "../../../database/schema/user";
@@ -7,14 +13,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../route-helper";
-import {
-  type CreateGameResponse,
-  createGameRequestSchema,
-  createGameResponseSchema,
-} from "./schema";
 
 export const createGame = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -24,17 +24,12 @@ export const createGame = (config: BaseHandlerConfig) =>
     request: createGameRequestSchema,
     response: createGameResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<CreateGameResponse>) => {
-      const parsed = createGameRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          code: REQUEST_SCHEMA_FAILURE_CODE,
-          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-        });
+      if (!isCreateGameRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
-      const { name, description, roundCount, createdBy } = parsed.data.body;
-      const participants = [...new Set([createdBy, ...parsed.data.body.participants])];
+      const { name, description, roundCount, createdBy } = req.body;
+      const participants = [...new Set([createdBy, ...req.body.participants])];
 
       try {
         const result = await config.db.transaction(async (tx) => {

@@ -1,3 +1,9 @@
+import {
+  isUpdateRoundRequest,
+  type UpdateRoundResponse,
+  updateRoundRequestSchema,
+  updateRoundResponseSchema,
+} from "@tier-list-league/api-schema";
 import { eq } from "drizzle-orm";
 import game from "../../../database/schema/game";
 import round from "../../../database/schema/round";
@@ -6,14 +12,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../route-helper";
-import {
-  type UpdateRoundResponse,
-  updateRoundRequestSchema,
-  updateRoundResponseSchema,
-} from "./schema";
 import { serializeRound } from "./serialize";
 
 export const updateRound = (config: BaseHandlerConfig) =>
@@ -24,16 +24,11 @@ export const updateRound = (config: BaseHandlerConfig) =>
     request: updateRoundRequestSchema,
     response: updateRoundResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<UpdateRoundResponse>) => {
-      const parsed = updateRoundRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          code: REQUEST_SCHEMA_FAILURE_CODE,
-          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-        });
+      if (!isUpdateRoundRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
-      const { topic, hostedBy, endsAt } = parsed.data.body;
+      const { topic, hostedBy, endsAt } = req.body;
       if (topic === undefined && hostedBy === undefined && endsAt === undefined) {
         return res.status(400).json({
           ok: false,
@@ -42,7 +37,7 @@ export const updateRound = (config: BaseHandlerConfig) =>
         });
       }
 
-      const roundId = parsed.data.params.id;
+      const roundId = req.params.id;
       try {
         const result = await config.db.transaction(async (tx) => {
           const [existing] = await tx

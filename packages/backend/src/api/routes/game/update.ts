@@ -1,3 +1,9 @@
+import {
+  isUpdateGameRequest,
+  type UpdateGameResponse,
+  updateGameRequestSchema,
+  updateGameResponseSchema,
+} from "@tier-list-league/api-schema";
 import { eq } from "drizzle-orm";
 import game from "../../../database/schema/game";
 import type { BaseHandlerConfig } from "../../handler";
@@ -5,14 +11,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../route-helper";
-import {
-  type UpdateGameResponse,
-  updateGameRequestSchema,
-  updateGameResponseSchema,
-} from "./schema";
 
 export const updateGame = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -22,16 +22,11 @@ export const updateGame = (config: BaseHandlerConfig) =>
     request: updateGameRequestSchema,
     response: updateGameResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<UpdateGameResponse>) => {
-      const parsed = updateGameRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          code: REQUEST_SCHEMA_FAILURE_CODE,
-          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-        });
+      if (!isUpdateGameRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
-      const { name, description, roundCount } = parsed.data.body;
+      const { name, description, roundCount } = req.body;
       if (name === undefined && description === undefined && roundCount === undefined) {
         return res.status(400).json({
           ok: false,
@@ -49,7 +44,7 @@ export const updateGame = (config: BaseHandlerConfig) =>
             ...(roundCount === undefined ? {} : { roundCount }),
             updatedAt: new Date(),
           })
-          .where(eq(game.id, parsed.data.params.id))
+          .where(eq(game.id, req.params.id))
           .returning();
         if (!updated) {
           return res.status(404).json({

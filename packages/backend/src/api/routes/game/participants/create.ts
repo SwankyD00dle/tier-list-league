@@ -1,3 +1,9 @@
+import {
+  addParticipantRequestSchema,
+  isAddParticipantRequest,
+  type ParticipantsResponse,
+  participantsResponseSchema,
+} from "@tier-list-league/api-schema";
 import { eq, sql } from "drizzle-orm";
 import game from "../../../../database/schema/game";
 import user from "../../../../database/schema/user";
@@ -6,14 +12,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../../route-helper";
-import {
-  addParticipantRequestSchema,
-  type ParticipantsResponse,
-  participantsResponseSchema,
-} from "./schema";
 
 export const addParticipant = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -23,17 +23,12 @@ export const addParticipant = (config: BaseHandlerConfig) =>
     request: addParticipantRequestSchema,
     response: participantsResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<ParticipantsResponse>) => {
-      const parsed = addParticipantRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          code: REQUEST_SCHEMA_FAILURE_CODE,
-          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-        });
+      if (!isAddParticipantRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
-      const { gameId } = parsed.data.params;
-      const { userId } = parsed.data.body;
+      const { gameId } = req.params;
+      const { userId } = req.body;
 
       try {
         const result = await config.db.transaction(async (tx) => {

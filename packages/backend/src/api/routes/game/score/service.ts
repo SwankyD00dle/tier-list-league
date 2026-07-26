@@ -1,5 +1,5 @@
+import type { GameScores, PlayerScore } from "@tier-list-league/api-schema/types";
 import type { RoundScoreDeltas } from "../../../../database/schema/round";
-import type { GameScores, PlayerScore } from "./schema";
 
 export const WINNER_SCORE = 3;
 export const HONORABLE_MENTION_SCORE = 1;

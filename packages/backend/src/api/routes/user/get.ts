@@ -1,3 +1,9 @@
+import {
+  type GetUserResponse,
+  getUserRequestSchema,
+  getUserResponseSchema,
+  isGetUserRequest,
+} from "@tier-list-league/api-schema";
 import { eq } from "drizzle-orm";
 import type { db } from "../../../database/client";
 import user from "../../../database/schema/user";
@@ -6,10 +12,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../route-helper";
-import { type GetUserResponse, getUserRequestSchema, getUserResponseSchema } from "./schema";
 
 export const getUser = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -19,16 +23,11 @@ export const getUser = (config: BaseHandlerConfig) =>
     request: getUserRequestSchema,
     response: getUserResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<GetUserResponse>) => {
-      const parsed = getUserRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          code: REQUEST_SCHEMA_FAILURE_CODE,
-          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-        });
+      if (!isGetUserRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
-      const [found] = await getUserFromDb(config.db, parsed.data.params.id);
+      const [found] = await getUserFromDb(config.db, req.params.id);
       if (!found) {
         return res.status(404).json({
           ok: false,

@@ -1,4 +1,10 @@
 import { randomUUID } from "node:crypto";
+import {
+  type CreateUserResponse,
+  createUserRequestSchema,
+  createUserResponseSchema,
+  isCreateUserRequest,
+} from "@tier-list-league/api-schema";
 import type { db } from "../../../database/client";
 import user from "../../../database/schema/user";
 import type { BaseHandlerConfig } from "../../handler";
@@ -6,14 +12,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../route-helper";
-import {
-  type CreateUserResponse,
-  createUserRequestSchema,
-  createUserResponseSchema,
-} from "./schema";
 
 export const createUser = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -26,16 +26,11 @@ export const createUser = (config: BaseHandlerConfig) =>
       const { log } = config;
 
       try {
-        const parsed = createUserRequestSchema.safeParse(req);
-        if (!parsed.success) {
-          return res.status(400).json({
-            ok: false,
-            code: REQUEST_SCHEMA_FAILURE_CODE,
-            message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-          });
+        if (!isCreateUserRequest(req)) {
+          return requestSchemaFailure(res);
         }
 
-        const { name, discordUserId } = parsed.data.body;
+        const { name, discordUserId } = req.body;
         const [created] = await createUserInDb(config.db, {
           id: randomUUID(),
           name,

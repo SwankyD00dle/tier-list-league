@@ -1,4 +1,10 @@
 import { randomUUID } from "node:crypto";
+import {
+  isSubmitTierListRequest,
+  type SubmitTierListResponse,
+  submitTierListRequestSchema,
+  submitTierListResponseSchema,
+} from "@tier-list-league/api-schema";
 import { and, eq, inArray } from "drizzle-orm";
 import game from "../../../../database/schema/game";
 import round from "../../../../database/schema/round";
@@ -8,14 +14,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../../route-helper";
-import {
-  type SubmitTierListResponse,
-  submitTierListRequestSchema,
-  submitTierListResponseSchema,
-} from "./schema";
 
 export const submitTierList = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -26,17 +26,12 @@ export const submitTierList = (config: BaseHandlerConfig) =>
     request: submitTierListRequestSchema,
     response: submitTierListResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<SubmitTierListResponse>) => {
-      const parsed = submitTierListRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          code: REQUEST_SCHEMA_FAILURE_CODE,
-          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-        });
+      if (!isSubmitTierListRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
-      const { roundId } = parsed.data.params;
-      const { userId, data } = parsed.data.body;
+      const { roundId } = req.params;
+      const { userId, data } = req.body;
 
       try {
         const result = await config.db.transaction(async (tx) => {
