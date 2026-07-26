@@ -1,15 +1,11 @@
 "use client";
 
+import type { MeResponse } from "@tier-list-league/api-schema";
 import { useEffect, useState } from "react";
-
-interface AuthUser {
-  id: string;
-  name: string;
-  discordUserId: string;
-}
+import { api, routes } from "@/api/api";
 
 export default function Home() {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<MeResponse | null>(null);
   const [ready, setReady] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -17,47 +13,10 @@ export default function Home() {
     let cancelled = false;
 
     async function loadSession() {
-      try {
-        const response = await fetch("/api/auth/me", { credentials: "include" });
-        if (!response.ok) {
-          if (!cancelled) {
-            setUser(null);
-          }
-          return;
-        }
-        const data: unknown = await response.json();
-        if (
-          typeof data === "object" &&
-          data !== null &&
-          "ok" in data &&
-          data.ok === true &&
-          "id" in data &&
-          typeof data.id === "string" &&
-          "name" in data &&
-          typeof data.name === "string" &&
-          "discordUserId" in data &&
-          typeof data.discordUserId === "string"
-        ) {
-          if (!cancelled) {
-            setUser({
-              id: data.id,
-              name: data.name,
-              discordUserId: data.discordUserId,
-            });
-          }
-          return;
-        }
-        if (!cancelled) {
-          setUser(null);
-        }
-      } catch {
-        if (!cancelled) {
-          setUser(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setReady(true);
-        }
+      const result = await api.me();
+      if (!cancelled) {
+        setUser(result.ok ? result.data : null);
+        setReady(true);
       }
     }
 
@@ -70,7 +29,7 @@ export default function Home() {
   async function handleLogout() {
     setLoggingOut(true);
     try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      await api.logout();
     } finally {
       setUser(null);
       setLoggingOut(false);
@@ -98,7 +57,7 @@ export default function Home() {
         <>
           <p className="text-gray-600 text-lg">Log in with Discord to get started.</p>
           <a
-            href="/api/auth/discord"
+            href={routes.discordAuth}
             className="rounded-lg bg-[#5865F2] px-4 py-2 font-medium text-white"
           >
             Log In with Discord
