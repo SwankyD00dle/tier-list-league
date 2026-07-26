@@ -1,6 +1,6 @@
 import type { infer as ZodInfer } from "zod/mini";
 import * as z from "zod/mini";
-import { apiRequestSchema, apiSuccessResponseSchema } from "../../../route-helper";
+import { apiRequestSchema, apiSuccessResponseSchema } from "./api-schema";
 
 export const scoreEntrySchema = z.object({
   score: z.number().check(z.int(), z.positive()),
@@ -71,6 +71,8 @@ export const getGameScoresRequestSchema = z.extend(apiRequestSchema, {
   }),
 });
 
+export type GetGameScoresRequest = ZodInfer<typeof getGameScoresRequestSchema>;
+
 export const getGameScoresResponseSchema = z.extend(apiSuccessResponseSchema, {
   scores: gameScoresSchema,
 });
@@ -83,6 +85,8 @@ export const getUserGameScoreRequestSchema = z.extend(apiRequestSchema, {
     userId: z.uuid(),
   }),
 });
+
+export type GetUserGameScoreRequest = ZodInfer<typeof getUserGameScoreRequestSchema>;
 
 export const getUserGameScoreResponseSchema = z.extend(apiSuccessResponseSchema, {
   userId: z.uuid(),

@@ -1,3 +1,9 @@
+import {
+  isListGamesRequest,
+  type ListGamesResponse,
+  listGamesRequestSchema,
+  listGamesResponseSchema,
+} from "@tier-list-league/api-schema";
 import type { db } from "../../../database/client";
 import game from "../../../database/schema/game";
 import type { BaseHandlerConfig } from "../../handler";
@@ -5,10 +11,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../route-helper";
-import { type ListGamesResponse, listGamesRequestSchema, listGamesResponseSchema } from "./schema";
 
 export const listGames = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -18,13 +22,8 @@ export const listGames = (config: BaseHandlerConfig) =>
     request: listGamesRequestSchema,
     response: listGamesResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<ListGamesResponse>) => {
-      const parsed = listGamesRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          code: REQUEST_SCHEMA_FAILURE_CODE,
-          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-        });
+      if (!isListGamesRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
       const games = await listGamesFromDb(config.db);

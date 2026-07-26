@@ -1,3 +1,9 @@
+import {
+  type GetTierListResponse,
+  getTierListRequestSchema,
+  getTierListResponseSchema,
+  isGetTierListRequest,
+} from "@tier-list-league/api-schema";
 import { eq } from "drizzle-orm";
 import type { db } from "../../../database/client";
 import tierList from "../../../database/schema/tier-list";
@@ -6,14 +12,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../route-helper";
-import {
-  type GetTierListResponse,
-  getTierListRequestSchema,
-  getTierListResponseSchema,
-} from "./schema";
 
 export const getTierList = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -23,16 +23,11 @@ export const getTierList = (config: BaseHandlerConfig) =>
     request: getTierListRequestSchema,
     response: getTierListResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<GetTierListResponse>) => {
-      const parsed = getTierListRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          code: REQUEST_SCHEMA_FAILURE_CODE,
-          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-        });
+      if (!isGetTierListRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
-      const [found] = await getTierListFromDb(config.db, parsed.data.params.id);
+      const [found] = await getTierListFromDb(config.db, req.params.id);
       if (!found) {
         return res.status(404).json({
           ok: false,

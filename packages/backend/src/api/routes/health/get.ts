@@ -1,3 +1,9 @@
+import {
+  type HealthResponse,
+  healthRequestSchema,
+  healthResponseSchema,
+  isHealthRequest,
+} from "@tier-list-league/api-schema";
 import { sql } from "drizzle-orm";
 import type { db } from "../../../database/client";
 import type { BaseHandlerConfig } from "../../handler";
@@ -5,10 +11,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../route-helper";
-import { type HealthResponse, healthRequestSchema, healthResponseSchema } from "./schema";
 
 export const healthCheck = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -18,13 +22,8 @@ export const healthCheck = (config: BaseHandlerConfig) =>
     request: healthRequestSchema,
     response: healthResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<HealthResponse>) => {
-      const parsed = healthRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          code: REQUEST_SCHEMA_FAILURE_CODE,
-          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-        });
+      if (!isHealthRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
       try {

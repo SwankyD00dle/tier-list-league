@@ -1,4 +1,10 @@
 import { randomUUID } from "node:crypto";
+import {
+  isSubmitGuessRequest,
+  type SubmitGuessResponse,
+  submitGuessRequestSchema,
+  submitGuessResponseSchema,
+} from "@tier-list-league/api-schema";
 import { and, eq } from "drizzle-orm";
 import game from "../../../../database/schema/game";
 import guess from "../../../../database/schema/guess";
@@ -8,14 +14,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../../route-helper";
-import {
-  type SubmitGuessResponse,
-  submitGuessRequestSchema,
-  submitGuessResponseSchema,
-} from "./schema";
 
 export const submitGuess = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -26,17 +26,12 @@ export const submitGuess = (config: BaseHandlerConfig) =>
     request: submitGuessRequestSchema,
     response: submitGuessResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<SubmitGuessResponse>) => {
-      const parsed = submitGuessRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          code: REQUEST_SCHEMA_FAILURE_CODE,
-          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-        });
+      if (!isSubmitGuessRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
-      const { roundId } = parsed.data.params;
-      const { userId, data } = parsed.data.body;
+      const { roundId } = req.params;
+      const { userId, data } = req.body;
 
       try {
         const result = await config.db.transaction(async (tx) => {

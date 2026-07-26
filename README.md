@@ -4,8 +4,9 @@ Web app monorepo (npm workspaces).
 
 ## Packages
 
-- `packages/frontend` — Next.js + React + Tailwind app (deploys to Vercel).
+- `packages/frontend` — Next.js + React + Tailwind app (deploys to Vercel). `api/api.ts` is the typed client for the backend.
 - `packages/backend` — Node API with a PostgreSQL database managed by Drizzle, runnable via Docker.
+- `packages/api-schema` — shared zod mini request/response schemas plus a typecheck per payload. Import `@tier-list-league/api-schema` for schemas and typechecks, or `@tier-list-league/api-schema/types` for types only.
 
 ## Local development
 

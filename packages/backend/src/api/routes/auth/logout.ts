@@ -1,4 +1,10 @@
 import {
+  isLogoutRequest,
+  type LogoutResponse,
+  logoutRequestSchema,
+  logoutResponseSchema,
+} from "@tier-list-league/api-schema";
+import {
   ACCESS_TOKEN_COOKIE,
   clearAuthCookieOptions,
   REFRESH_TOKEN_COOKIE,
@@ -6,8 +12,12 @@ import {
 import { revokeRefreshToken } from "../../auth/tokens";
 import { parseCookies } from "../../cookie";
 import type { BaseHandlerConfig } from "../../handler";
-import { type ApiRequest, type ApiResponse, defineRoute } from "../../route-helper";
-import { type LogoutResponse, logoutRequestSchema, logoutResponseSchema } from "./schema";
+import {
+  type ApiRequest,
+  type ApiResponse,
+  defineRoute,
+  requestSchemaFailure,
+} from "../../route-helper";
 
 export const logout = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -19,17 +29,12 @@ export const logout = (config: BaseHandlerConfig) =>
     handler: async (req: ApiRequest, res: ApiResponse<LogoutResponse>) => {
       const { log } = config;
 
-      const parsedRequest = logoutRequestSchema.safeParse(req);
-      if (!parsedRequest.success) {
-        return res.status(400).json({
-          ok: false,
-          code: "INVALID_REQUEST",
-          message: "Invalid request",
-        });
+      if (!isLogoutRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
       try {
-        const cookies = parseCookies(parsedRequest.data.headers?.cookie);
+        const cookies = parseCookies(req.headers?.cookie);
         const presented = cookies[REFRESH_TOKEN_COOKIE];
         if (presented) {
           await revokeRefreshToken(config.db, presented);

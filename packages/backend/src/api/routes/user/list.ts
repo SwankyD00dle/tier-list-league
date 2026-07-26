@@ -1,3 +1,9 @@
+import {
+  isListUsersRequest,
+  type ListUsersResponse,
+  listUsersRequestSchema,
+  listUsersResponseSchema,
+} from "@tier-list-league/api-schema";
 import type { db } from "../../../database/client";
 import user from "../../../database/schema/user";
 import type { BaseHandlerConfig } from "../../handler";
@@ -5,10 +11,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../route-helper";
-import { type ListUsersResponse, listUsersRequestSchema, listUsersResponseSchema } from "./schema";
 
 export const listUsers = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -18,13 +22,8 @@ export const listUsers = (config: BaseHandlerConfig) =>
     request: listUsersRequestSchema,
     response: listUsersResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<ListUsersResponse>) => {
-      const parsed = listUsersRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          code: REQUEST_SCHEMA_FAILURE_CODE,
-          message: parsed.error.issues[0]?.message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-        });
+      if (!isListUsersRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
       const users = await listUsersFromDb(config.db);

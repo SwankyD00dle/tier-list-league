@@ -1,6 +1,6 @@
 import type { infer as ZodInfer } from "zod/mini";
 import * as z from "zod/mini";
-import { apiRequestSchema, apiSuccessResponseSchema } from "../../../route-helper";
+import { apiRequestSchema, apiSuccessResponseSchema } from "./api-schema";
 
 export const addParticipantRequestSchema = z.extend(apiRequestSchema, {
   params: z.object({

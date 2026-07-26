@@ -10,6 +10,7 @@
     "typecheck": "node ../../node_modules/tsc-native/bin/tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@tier-list-league/api-schema": "*",
     "next": "^16.2.11",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

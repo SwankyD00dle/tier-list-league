@@ -1,3 +1,13 @@
+import {
+  type GetGameScoresResponse,
+  type GetUserGameScoreResponse,
+  getGameScoresRequestSchema,
+  getGameScoresResponseSchema,
+  getUserGameScoreRequestSchema,
+  getUserGameScoreResponseSchema,
+  isGetGameScoresRequest,
+  isGetUserGameScoreRequest,
+} from "@tier-list-league/api-schema";
 import { and, eq } from "drizzle-orm";
 import type { db } from "../../../../database/client";
 import game from "../../../../database/schema/game";
@@ -7,17 +17,8 @@ import {
   type ApiRequest,
   type ApiResponse,
   defineRoute,
-  REQUEST_SCHEMA_FAILURE_CODE,
-  REQUEST_SCHEMA_FAILURE_MESSAGE,
+  requestSchemaFailure,
 } from "../../../route-helper";
-import {
-  type GetGameScoresResponse,
-  type GetUserGameScoreResponse,
-  getGameScoresRequestSchema,
-  getGameScoresResponseSchema,
-  getUserGameScoreRequestSchema,
-  getUserGameScoreResponseSchema,
-} from "./schema";
 import { aggregateGameScores } from "./service";
 
 export const getGameScores = (config: BaseHandlerConfig) =>
@@ -28,12 +29,11 @@ export const getGameScores = (config: BaseHandlerConfig) =>
     request: getGameScoresRequestSchema,
     response: getGameScoresResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<GetGameScoresResponse>) => {
-      const parsed = getGameScoresRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return validationError(res, parsed.error.issues[0]?.message);
+      if (!isGetGameScoresRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
-      const gameId = parsed.data.params.gameId;
+      const gameId = req.params.gameId;
       const gameRow = await findGame(config.db, gameId);
       if (!gameRow) {
         return res.status(404).json({
@@ -59,12 +59,11 @@ export const getUserGameScore = (config: BaseHandlerConfig) =>
     request: getUserGameScoreRequestSchema,
     response: getUserGameScoreResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<GetUserGameScoreResponse>) => {
-      const parsed = getUserGameScoreRequestSchema.safeParse(req);
-      if (!parsed.success) {
-        return validationError(res, parsed.error.issues[0]?.message);
+      if (!isGetUserGameScoreRequest(req)) {
+        return requestSchemaFailure(res);
       }
 
-      const { gameId, userId } = parsed.data.params;
+      const { gameId, userId } = req.params;
       const gameRow = await findGame(config.db, gameId);
       if (!gameRow) {
         return res.status(404).json({
@@ -119,12 +118,4 @@ function findScoreEntries(database: typeof db, gameId: string, userId?: string) 
         : and(eq(scoreEntry.game, gameId), eq(scoreEntry.user, userId)),
     )
     .orderBy(scoreEntry.createdAt, scoreEntry.id);
-}
-
-function validationError<TSuccess>(res: ApiResponse<TSuccess>, message?: string) {
-  return res.status(400).json({
-    ok: false,
-    code: REQUEST_SCHEMA_FAILURE_CODE,
-    message: message ?? REQUEST_SCHEMA_FAILURE_MESSAGE,
-  });
 }
