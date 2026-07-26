@@ -1,6 +1,7 @@
 export type { Game } from "./game";
 export type { Guess } from "./guess";
 export type { ProfilePicture } from "./profile-picture";
+export type { RefreshToken } from "./refresh-token";
 export type {
   HonorableMention,
   PlayerRoundScore,
