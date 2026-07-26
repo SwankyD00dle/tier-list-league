@@ -1,5 +1,10 @@
 import type { BaseHandlerConfig } from "../handler";
 import type { RegisteredRoute } from "../router";
+import { discordCallback } from "./auth/callback";
+import { startDiscordAuth } from "./auth/discord";
+import { logout } from "./auth/logout";
+import { getMe } from "./auth/me";
+import { refreshAuth } from "./auth/refresh";
 import { createGame } from "./game/create";
 import { getGame } from "./game/get";
 import { listGames } from "./game/list";
@@ -22,6 +27,11 @@ import { listUsers } from "./user/list";
 export function buildRoutes(config: BaseHandlerConfig): RegisteredRoute[] {
   return [
     { method: "GET", path: "/api/health", definition: healthCheck(config) },
+    { method: "GET", path: "/api/auth/discord", definition: startDiscordAuth(config) },
+    { method: "GET", path: "/api/auth/discord/callback", definition: discordCallback(config) },
+    { method: "POST", path: "/api/auth/refresh", definition: refreshAuth(config) },
+    { method: "POST", path: "/api/auth/logout", definition: logout(config) },
+    { method: "GET", path: "/api/auth/me", definition: getMe(config) },
     { method: "GET", path: "/api/users", definition: listUsers(config) },
     { method: "POST", path: "/api/users", definition: createUser(config) },
     { method: "GET", path: "/api/users/:id", definition: getUser(config) },

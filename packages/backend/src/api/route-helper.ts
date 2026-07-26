@@ -8,6 +8,7 @@ export const apiRequestSchema = z.object({
   params: z.optional(z.record(z.string(), z.string())),
   query: z.optional(z.record(z.string(), z.union([z.string(), z.array(z.string())]))),
   body: z.optional(z.unknown()),
+  headers: z.optional(z.record(z.string(), z.union([z.string(), z.array(z.string())]))),
 });
 
 export type ApiRequest = ZodInfer<typeof apiRequestSchema>;
@@ -27,8 +28,21 @@ export const apiErrorResponseSchema = z.object({
 
 export type ApiErrorResponse = ZodInfer<typeof apiErrorResponseSchema>;
 
+export interface CookieOptions {
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: "Strict" | "Lax" | "None";
+  path?: string;
+  maxAge?: number;
+  expires?: Date;
+}
+
 export type ApiResponse<TSuccess> = {
   status(code: number): ApiResponse<TSuccess>;
+  setHeader(name: string, value: string): ApiResponse<TSuccess>;
+  setCookie(name: string, value: string, options?: CookieOptions): ApiResponse<TSuccess>;
+  clearCookie(name: string, options?: CookieOptions): ApiResponse<TSuccess>;
+  redirect(url: string): ApiResponse<TSuccess>;
   json(body: TSuccess | ApiErrorResponse): ApiResponse<TSuccess>;
 };
 

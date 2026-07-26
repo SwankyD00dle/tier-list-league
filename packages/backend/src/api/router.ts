@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { ApiRequest, ApiResponse, DefinedRoute } from "./route-helper";
+import { serializeCookie } from "./cookie";
+import type { ApiRequest, ApiResponse, CookieOptions, DefinedRoute } from "./route-helper";
 
 export interface RegisteredRoute {
   method: string;
@@ -47,6 +48,27 @@ function readBody(req: IncomingMessage): Promise<unknown> {
   });
 }
 
+function normalizeHeaders(req: IncomingMessage): Record<string, string | string[]> {
+  const headers: Record<string, string | string[]> = {};
+  for (const [name, value] of Object.entries(req.headers)) {
+    if (value !== undefined) {
+      headers[name] = value;
+    }
+  }
+  return headers;
+}
+
+function appendSetCookie(pendingHeaders: Record<string, string | string[]>, cookie: string): void {
+  const existing = pendingHeaders["set-cookie"];
+  if (existing === undefined) {
+    pendingHeaders["set-cookie"] = cookie;
+  } else if (typeof existing === "string") {
+    pendingHeaders["set-cookie"] = [existing, cookie];
+  } else {
+    existing.push(cookie);
+  }
+}
+
 export function createRouter(routes: RegisteredRoute[]) {
   const compiled: CompiledRoute[] = routes.map((route) => ({ ...route, ...compile(route.path) }));
 
@@ -56,13 +78,51 @@ export function createRouter(routes: RegisteredRoute[]) {
     const pathname = url.pathname;
 
     const pending = { status: 200 };
+    const pendingHeaders: Record<string, string | string[]> = {};
+    let ended = false;
+
     const reply: ApiResponse<unknown> = {
       status(code) {
         pending.status = code;
         return reply;
       },
+      setHeader(name, value) {
+        pendingHeaders[name.toLowerCase()] = value;
+        return reply;
+      },
+      setCookie(name, value, options) {
+        appendSetCookie(pendingHeaders, serializeCookie(name, value, options));
+        return reply;
+      },
+      clearCookie(name, options: CookieOptions = {}) {
+        appendSetCookie(
+          pendingHeaders,
+          serializeCookie(name, "", { ...options, maxAge: 0, expires: new Date(0) }),
+        );
+        return reply;
+      },
+      redirect(urlTarget) {
+        if (ended) {
+          return reply;
+        }
+        ended = true;
+        if (pending.status === 200) {
+          pending.status = 302;
+        }
+        pendingHeaders.location = urlTarget;
+        res.writeHead(pending.status, pendingHeaders);
+        res.end();
+        return reply;
+      },
       json(body) {
-        res.writeHead(pending.status, { "content-type": "application/json" });
+        if (ended) {
+          return reply;
+        }
+        ended = true;
+        res.writeHead(pending.status, {
+          "content-type": "application/json",
+          ...pendingHeaders,
+        });
         res.end(JSON.stringify(body));
         return reply;
       },
@@ -101,7 +161,12 @@ export function createRouter(routes: RegisteredRoute[]) {
       }
     }
 
-    const routeReq: ApiRequest = { body, params, query };
+    const routeReq: ApiRequest = {
+      body,
+      params,
+      query,
+      headers: normalizeHeaders(req),
+    };
     try {
       await match.definition.handler(routeReq, reply);
     } catch {
