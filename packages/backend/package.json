@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local ../../node_modules/drizzle-kit/bin.cjs migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
   },
