@@ -1,6 +1,7 @@
 "use client";
 
 import type { MeResponse } from "@tier-list-league/api-schema";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, routes } from "@/api/api";
 
@@ -44,14 +45,22 @@ export default function Home() {
       ) : user ? (
         <>
           <p className="text-gray-600 text-lg">Welcome, {user.name}.</p>
-          <button
-            type="button"
-            onClick={() => void handleLogout()}
-            disabled={loggingOut}
-            className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-900 transition-opacity disabled:opacity-50"
-          >
-            Log out
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/game"
+              className="rounded-lg bg-[#5865F2] px-4 py-2 font-medium text-white"
+            >
+              Go to my games
+            </Link>
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              disabled={loggingOut}
+              className="rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-900 transition-opacity disabled:opacity-50"
+            >
+              Log out
+            </button>
+          </div>
         </>
       ) : (
         <>
