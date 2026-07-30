@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Default avatar 4">
+  <rect x="7" y="7" width="114" height="114" rx="30" fill="#84cc16" stroke="#5f9310" stroke-width="6"/>
+  <g><path d="M38 54 Q46 61 54 54" fill="none" stroke="#1f2430" stroke-width="6" stroke-linecap="round"/><path d="M74 54 Q82 61 90 54" fill="none" stroke="#1f2430" stroke-width="6" stroke-linecap="round"/></g>
+  <g><path d="M46 82 Q64 100 82 82" fill="none" stroke="#1f2430" stroke-width="6" stroke-linecap="round"/></g>
+</svg>

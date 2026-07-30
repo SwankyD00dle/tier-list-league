@@ -15,7 +15,8 @@
     "format": "biome format --write .",
     "lint": "biome lint .",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "generate:avatars": "node scripts/generate-default-avatars.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.5",

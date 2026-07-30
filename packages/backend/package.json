@@ -12,13 +12,15 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local ../../node_modules/drizzle-kit/bin.cjs migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "seed:default-avatars": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local --env-file-if-exists=.env --import tsx src/scripts/seed-default-avatars.ts"
   },
   "exports": {
     "./schema": "./src/database/schema/types.ts"
   },
   "dependencies": {
     "@tier-list-league/api-schema": "*",
+    "@vercel/blob": "^2.0.0",
     "drizzle-orm": "1.0.0-rc.4",
     "jose": "^6.2.4",
     "postgres": "^3.4.9",
