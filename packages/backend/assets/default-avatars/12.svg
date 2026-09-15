@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Default avatar 12">
+  <rect x="7" y="7" width="114" height="114" rx="30" fill="#a855f7" stroke="#793db2" stroke-width="6"/>
+  <g><circle cx="46" cy="58" r="6.5" fill="#1f2430"/><circle cx="82" cy="58" r="6.5" fill="#1f2430"/><path d="M36 44 L54 51" stroke="#1f2430" stroke-width="5" stroke-linecap="round"/><path d="M92 44 L74 51" stroke="#1f2430" stroke-width="5" stroke-linecap="round"/></g>
+  <g><ellipse cx="64" cy="90" rx="11" ry="14" fill="#1f2430"/></g>
+</svg>
