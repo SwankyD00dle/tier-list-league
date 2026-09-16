@@ -1,5 +1,7 @@
+import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import {
+  authenticatedRequest,
   createMockConfig,
   createMockDb,
   createMockResponse,
@@ -19,7 +21,7 @@ describe("listGames", () => {
           id: gameId,
           name: "Season 1",
           description: "First season",
-          participants: [],
+          participants: [gameId],
           roundCount: 1,
           rounds: [],
           createdBy: null,
@@ -31,7 +33,7 @@ describe("listGames", () => {
     const { res, state } = createMockResponse();
     const route = listGames(createMockConfig(database));
 
-    await route.handler(emptyRequest(), res);
+    await route.handler(await authenticatedRequest(emptyRequest()), res);
 
     expect(state.statusCode).toBe(200);
     expect(state.body).toEqual({
@@ -41,7 +43,7 @@ describe("listGames", () => {
           id: gameId,
           name: "Season 1",
           description: "First season",
-          participants: [],
+          participants: [gameId],
           roundCount: 1,
           rounds: [],
           createdBy: null,
@@ -56,9 +58,33 @@ describe("listGames", () => {
     const { res, state } = createMockResponse();
     const route = listGames(createMockConfig(createMockDb({ selectResult: [] })));
 
-    await route.handler(emptyRequest(), res);
+    await route.handler(await authenticatedRequest(emptyRequest()), res);
 
     expect(state.statusCode).toBe(200);
     expect(state.body).toEqual({ ok: true, games: [] });
   });
+});
+
+it("filters games in SQL by authenticated admin OR participant, not caller query parameters", async () => {
+  const conditions: { sql: string; params: unknown[] }[] = [];
+  const database = createMockDb({
+    onSelectWhere(condition) {
+      if (condition) {
+        const { sql, params } = new PgDialect().sqlToQuery(condition);
+        conditions.push({ sql, params });
+      }
+    },
+  });
+  const { res, state } = createMockResponse();
+  await listGames(createMockConfig(database)).handler(
+    await authenticatedRequest({ query: { userId: "another-user" } }, gameId),
+    res,
+  );
+  expect(state.statusCode).toBe(200);
+  expect(conditions).toEqual([
+    {
+      sql: '(("game"."created_by" = $1) or ("game"."participant_ids" @> $2))',
+      params: [gameId, [gameId]],
+    },
+  ]);
 });

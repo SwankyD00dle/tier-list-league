@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { REQUEST_SCHEMA_FAILURE_CODE } from "../../../../route-helper";
-import { createMockConfig, createMockDb, createMockResponse } from "../../../../test-helpers";
+import {
+  authenticatedRequest,
+  createMockConfig,
+  createMockDb,
+  createMockResponse,
+} from "../../../../test-helpers";
 import { getGameScores, getUserGameScore } from "../get";
 
 const gameId = "550e8400-e29b-41d4-a716-446655440000";
@@ -18,7 +23,10 @@ describe("score reads", () => {
     });
     const { res, state } = createMockResponse();
 
-    await getGameScores(createMockConfig(database)).handler({ params: { gameId } }, res);
+    await getGameScores(createMockConfig(database)).handler(
+      await authenticatedRequest({ params: { gameId } }, user1),
+      res,
+    );
 
     expect(state.statusCode).toBe(200);
     expect(state.body).toEqual({
@@ -48,7 +56,7 @@ describe("score reads", () => {
     const { res, state } = createMockResponse();
 
     await getUserGameScore(createMockConfig(database)).handler(
-      { params: { gameId, userId: user1 } },
+      await authenticatedRequest({ params: { gameId, userId: user1 } }, user1),
       res,
     );
 
@@ -73,7 +81,7 @@ describe("score reads", () => {
     const { res, state } = createMockResponse();
 
     await getUserGameScore(createMockConfig(database)).handler(
-      { params: { gameId, userId: user2 } },
+      await authenticatedRequest({ params: { gameId, userId: user2 } }, user1),
       res,
     );
 
@@ -89,7 +97,7 @@ describe("score reads", () => {
     const { res, state } = createMockResponse();
 
     await getUserGameScore(createMockConfig()).handler(
-      { params: { gameId: "bad", userId: "bad" } },
+      await authenticatedRequest({ params: { gameId: "bad", userId: "bad" } }, user1),
       res,
     );
 

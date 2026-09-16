@@ -12,6 +12,8 @@ import { and, eq } from "drizzle-orm";
 import type { db } from "../../../../database/client";
 import game from "../../../../database/schema/game";
 import scoreEntry from "../../../../database/schema/score-entry";
+import { forbiddenResponse } from "../../../auth/game-access";
+import { requireAuth } from "../../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../../handler";
 import {
   type ApiRequest,
@@ -29,6 +31,10 @@ export const getGameScores = (config: BaseHandlerConfig) =>
     request: getGameScoresRequestSchema,
     response: getGameScoresResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<GetGameScoresResponse>) => {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
       if (!isGetGameScoresRequest(req)) {
         return requestSchemaFailure(res);
       }
@@ -41,6 +47,10 @@ export const getGameScores = (config: BaseHandlerConfig) =>
           code: "NOT_FOUND",
           message: "Game not found",
         });
+      }
+
+      if (!gameRow.participants.includes(auth.sub)) {
+        return forbiddenResponse(res);
       }
 
       const entries = await findScoreEntries(config.db, gameId);
@@ -59,6 +69,10 @@ export const getUserGameScore = (config: BaseHandlerConfig) =>
     request: getUserGameScoreRequestSchema,
     response: getUserGameScoreResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<GetUserGameScoreResponse>) => {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
       if (!isGetUserGameScoreRequest(req)) {
         return requestSchemaFailure(res);
       }
@@ -72,6 +86,10 @@ export const getUserGameScore = (config: BaseHandlerConfig) =>
           message: "Game not found",
         });
       }
+      if (!gameRow.participants.includes(auth.sub)) {
+        return forbiddenResponse(res);
+      }
+
       if (!gameRow.participants.includes(userId)) {
         return res.status(404).json({
           ok: false,

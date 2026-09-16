@@ -42,8 +42,6 @@ export const createGameBodySchema = z.object({
   name: z.string().check(z.minLength(1), z.maxLength(200)),
   description: z.string().check(z.maxLength(2000)),
   roundCount: z.number().check(z.int(), z.positive()),
-  createdBy: z.uuid(),
-  participants: z.array(z.uuid()),
 });
 
 export const createGameRequestSchema = z.extend(apiRequestSchema, {
