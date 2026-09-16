@@ -46,10 +46,7 @@ export default function Home() {
         <>
           <p className="text-gray-600 text-lg">Welcome, {user.name}.</p>
           <div className="flex items-center gap-3">
-            <Link
-              href="/game"
-              className="rounded-lg bg-[#5865F2] px-4 py-2 font-medium text-white"
-            >
+            <Link href="/game" className="rounded-lg bg-[#5865F2] px-4 py-2 font-medium text-white">
               Go to my games
             </Link>
             <button
