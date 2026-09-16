@@ -30,24 +30,27 @@ export default function GamesPage() {
     }
     setUser(me.data);
 
-    const [gamesResult, usersResult] = await Promise.all([api.listGames(), api.listUsers()]);
-
-    if (usersResult.ok) {
-      setUsersById(new Map(usersResult.data.users.map((entry) => [entry.id, entry] as const)));
-    }
+    const gamesResult = await api.listGames();
 
     if (!gamesResult.ok) {
       setState("error");
       return;
     }
 
-    // The list endpoint returns every game, so narrow to the ones this user belongs to.
-    const mine = gamesResult.data.games.filter(
-      (game) => game.createdBy === me.data.id || game.participants.includes(me.data.id),
+    // The API scopes games to the session; load names only for these participants.
+    const users = await Promise.all(
+      [...new Set(gamesResult.data.games.flatMap((game) => game.participants))].map((id) =>
+        api.getUser(id),
+      ),
     );
-    mine.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
-
-    setGames(mine);
+    setUsersById(
+      new Map<string, UserSummary>(
+        users.flatMap((result) => (result.ok ? [[result.data.user.id, result.data.user]] : [])),
+      ),
+    );
+    setGames(
+      gamesResult.data.games.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
+    );
     setState("ready");
   }, []);
 
@@ -115,12 +118,7 @@ export default function GamesPage() {
     content = (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {games.map((game) => (
-          <GameCard
-            key={game.id}
-            game={game}
-            currentUserId={user.id}
-            usersById={usersById}
-          />
+          <GameCard key={game.id} game={game} currentUserId={user.id} usersById={usersById} />
         ))}
       </div>
     );
@@ -152,7 +150,6 @@ export default function GamesPage() {
 
       {creating ? (
         <CreateGameModal
-          createdBy={user.id}
           onClose={() => setCreating(false)}
           onCreated={() => {
             setCreating(false);

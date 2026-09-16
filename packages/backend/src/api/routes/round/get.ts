@@ -7,6 +7,8 @@ import {
 import { eq } from "drizzle-orm";
 import type { db } from "../../../database/client";
 import round from "../../../database/schema/round";
+import { forbiddenResponse, hasGameRole } from "../../auth/game-access";
+import { requireAuth } from "../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../handler";
 import {
   type ApiRequest,
@@ -23,6 +25,10 @@ export const getRound = (config: BaseHandlerConfig) =>
     request: getRoundRequestSchema,
     response: getRoundResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<GetRoundResponse>) => {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
       if (!isGetRoundRequest(req)) {
         return requestSchemaFailure(res);
       }
@@ -34,6 +40,10 @@ export const getRound = (config: BaseHandlerConfig) =>
           code: "NOT_FOUND",
           message: "Round not found",
         });
+      }
+
+      if (!(await hasGameRole(config.db, found.game, auth.sub, "participant"))) {
+        return forbiddenResponse(res);
       }
 
       return res.status(200).json({

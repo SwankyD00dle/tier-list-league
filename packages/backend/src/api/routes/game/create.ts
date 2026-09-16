@@ -8,6 +8,7 @@ import {
 import { inArray, sql } from "drizzle-orm";
 import game from "../../../database/schema/game";
 import user from "../../../database/schema/user";
+import { requireAuth } from "../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../handler";
 import {
   type ApiRequest,
@@ -19,17 +20,22 @@ import {
 export const createGame = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
     summary: "Create game",
-    description: "Create a game and enroll its initial participants.",
+    description: "Create a game administered by and initially enrolling the authenticated user.",
     tags: ["Game"],
     request: createGameRequestSchema,
     response: createGameResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<CreateGameResponse>) => {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
       if (!isCreateGameRequest(req)) {
         return requestSchemaFailure(res);
       }
 
-      const { name, description, roundCount, createdBy } = req.body;
-      const participants = [...new Set([createdBy, ...req.body.participants])];
+      const { name, description, roundCount } = req.body;
+      const createdBy = auth.sub;
+      const participants = [createdBy];
 
       try {
         const result = await config.db.transaction(async (tx) => {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createMockConfig, createMockDb, createMockResponse } from "../../../../test-helpers";
+import {
+  authenticatedRequest,
+  createMockConfig,
+  createMockDb,
+  createMockResponse,
+} from "../../../../test-helpers";
 import { submitTierList } from "../create";
 
 const roundId = "550e8400-e29b-41d4-a716-446655440000";
@@ -31,7 +36,7 @@ describe("submitTierList", () => {
     const { res, state } = createMockResponse();
 
     await submitTierList(createMockConfig(database)).handler(
-      { params: { roundId }, body: { userId: hostId, data } },
+      await authenticatedRequest({ params: { roundId }, body: { userId: hostId, data } }, hostId),
       res,
     );
 
@@ -60,7 +65,10 @@ describe("submitTierList", () => {
     const { res, state } = createMockResponse();
 
     await submitTierList(createMockConfig(database)).handler(
-      { params: { roundId }, body: { userId: playerId, data } },
+      await authenticatedRequest(
+        { params: { roundId }, body: { userId: playerId, data } },
+        playerId,
+      ),
       res,
     );
 
@@ -90,7 +98,10 @@ describe("submitTierList", () => {
     const { res, state } = createMockResponse();
 
     await submitTierList(createMockConfig(database)).handler(
-      { params: { roundId }, body: { userId: playerId, data } },
+      await authenticatedRequest(
+        { params: { roundId }, body: { userId: playerId, data } },
+        playerId,
+      ),
       res,
     );
 
@@ -100,20 +111,26 @@ describe("submitTierList", () => {
 
   it("rejects submissions on a finalized round", async () => {
     const database = createMockDb({
-      selectResult: [
-        {
-          game: gameId,
-          hostedBy: hostId,
-          tierList: null,
-          participantTierLists: null,
-          winningGuess: tierListId,
-        },
+      selectResults: [
+        [
+          {
+            game: gameId,
+            hostedBy: hostId,
+            tierList: null,
+            participantTierLists: null,
+            winningGuess: tierListId,
+          },
+        ],
+        [{ participants: [hostId, playerId] }],
       ],
     });
     const { res, state } = createMockResponse();
 
     await submitTierList(createMockConfig(database)).handler(
-      { params: { roundId }, body: { userId: playerId, data } },
+      await authenticatedRequest(
+        { params: { roundId }, body: { userId: playerId, data } },
+        playerId,
+      ),
       res,
     );
 

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createMockConfig, createMockDb, createMockResponse } from "../../../test-helpers";
+import {
+  authenticatedRequest,
+  createMockConfig,
+  createMockDb,
+  createMockResponse,
+} from "../../../test-helpers";
 import { createRound } from "../create";
 import { updateRound } from "../update";
 
@@ -31,13 +36,18 @@ const newRound = {
 describe("createRound", () => {
   it("creates the next round and returns 201", async () => {
     const database = createMockDb({
-      selectResult: [{ participants: [hostId], rounds: [] }],
+      selectResult: [
+        { createdBy: "550e8400-e29b-41d4-a716-446655440000", participants: [hostId], rounds: [] },
+      ],
       insertResult: [newRound],
     });
     const { res, state } = createMockResponse();
 
     await createRound(createMockConfig(database)).handler(
-      { params: { gameId }, body: { topic: "Best pizza toppings", hostedBy: hostId } },
+      await authenticatedRequest({
+        params: { gameId },
+        body: { topic: "Best pizza toppings", hostedBy: hostId },
+      }),
       res,
     );
 
@@ -49,11 +59,18 @@ describe("createRound", () => {
   });
 
   it("rejects a host who is not a participant", async () => {
-    const database = createMockDb({ selectResult: [{ participants: [hostId], rounds: [] }] });
+    const database = createMockDb({
+      selectResult: [
+        { createdBy: "550e8400-e29b-41d4-a716-446655440000", participants: [hostId], rounds: [] },
+      ],
+    });
     const { res, state } = createMockResponse();
 
     await createRound(createMockConfig(database)).handler(
-      { params: { gameId }, body: { topic: "Topic", hostedBy: outsiderId } },
+      await authenticatedRequest({
+        params: { gameId },
+        body: { topic: "Topic", hostedBy: outsiderId },
+      }),
       res,
     );
 
@@ -69,13 +86,16 @@ describe("createRound", () => {
 describe("updateRound", () => {
   it("updates an unfinalized round", async () => {
     const database = createMockDb({
-      selectResult: [{ id: roundId, game: gameId, winningGuess: null }],
+      selectResults: [
+        [{ id: roundId, game: gameId, winningGuess: null }],
+        [{ createdBy: "550e8400-e29b-41d4-a716-446655440000", participants: [hostId] }],
+      ],
       updateResult: [{ ...newRound, topic: "New topic", updatedAt: createdAt }],
     });
     const { res, state } = createMockResponse();
 
     await updateRound(createMockConfig(database)).handler(
-      { params: { id: roundId }, body: { topic: "New topic" } },
+      await authenticatedRequest({ params: { id: roundId }, body: { topic: "New topic" } }),
       res,
     );
 
@@ -85,12 +105,15 @@ describe("updateRound", () => {
 
   it("rejects updates to a finalized round", async () => {
     const database = createMockDb({
-      selectResult: [{ id: roundId, game: gameId, winningGuess }],
+      selectResults: [
+        [{ id: roundId, game: gameId, winningGuess }],
+        [{ createdBy: "550e8400-e29b-41d4-a716-446655440000", participants: [hostId] }],
+      ],
     });
     const { res, state } = createMockResponse();
 
     await updateRound(createMockConfig(database)).handler(
-      { params: { id: roundId }, body: { topic: "New topic" } },
+      await authenticatedRequest({ params: { id: roundId }, body: { topic: "New topic" } }),
       res,
     );
 
@@ -105,7 +128,10 @@ describe("updateRound", () => {
   it("rejects an empty update", async () => {
     const { res, state } = createMockResponse();
 
-    await updateRound(createMockConfig()).handler({ params: { id: roundId }, body: {} }, res);
+    await updateRound(createMockConfig()).handler(
+      await authenticatedRequest({ params: { id: roundId }, body: {} }),
+      res,
+    );
 
     expect(state.statusCode).toBe(400);
     expect(state.body).toMatchObject({ ok: false, code: "EMPTY_UPDATE" });

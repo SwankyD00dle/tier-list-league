@@ -4,7 +4,6 @@ import { type FormEvent, useState } from "react";
 import { api } from "@/api/api";
 
 type CreateGameModalProps = {
-  createdBy: string;
   onClose: () => void;
   onCreated: () => void;
 };
@@ -13,7 +12,7 @@ const DEFAULT_ROUND_COUNT = 3;
 const MAX_NAME_LENGTH = 200;
 const MAX_DESCRIPTION_LENGTH = 2000;
 
-export function CreateGameModal({ createdBy, onClose, onCreated }: CreateGameModalProps) {
+export function CreateGameModal({ onClose, onCreated }: CreateGameModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [roundCount, setRoundCount] = useState(DEFAULT_ROUND_COUNT);
@@ -36,8 +35,6 @@ export function CreateGameModal({ createdBy, onClose, onCreated }: CreateGameMod
       name: trimmedName,
       description: description.trim(),
       roundCount,
-      createdBy,
-      participants: [createdBy],
     });
 
     if (result.ok) {

@@ -77,7 +77,9 @@ export function GameCard({ game, currentUserId, usersById, needsAction = false }
               <Avatar key={userId} name={displayName(userId)} seed={userId} size="sm" />
             ))}
           </div>
-          {hiddenCount > 0 ? <span className="ml-2 text-gray-500 text-xs">+{hiddenCount}</span> : null}
+          {hiddenCount > 0 ? (
+            <span className="ml-2 text-gray-500 text-xs">+{hiddenCount}</span>
+          ) : null}
         </div>
         <span className="text-gray-500 text-xs">
           {game.participants.length} {game.participants.length === 1 ? "player" : "players"}

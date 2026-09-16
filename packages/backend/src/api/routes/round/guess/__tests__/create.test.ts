@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createMockConfig, createMockDb, createMockResponse } from "../../../../test-helpers";
+import {
+  authenticatedRequest,
+  createMockConfig,
+  createMockDb,
+  createMockResponse,
+} from "../../../../test-helpers";
 import { submitGuess } from "../create";
 
 const roundId = "550e8400-e29b-41d4-a716-446655440000";
@@ -30,7 +35,10 @@ describe("submitGuess", () => {
     const { res, state } = createMockResponse();
 
     await submitGuess(createMockConfig(database)).handler(
-      { params: { roundId }, body: { userId, data: "Pepperoni" } },
+      await authenticatedRequest(
+        { params: { roundId }, body: { userId, data: "Pepperoni" } },
+        userId,
+      ),
       res,
     );
 
@@ -50,7 +58,10 @@ describe("submitGuess", () => {
     const { res, state } = createMockResponse();
 
     await submitGuess(createMockConfig(database)).handler(
-      { params: { roundId }, body: { userId, data: "Pineapple" } },
+      await authenticatedRequest(
+        { params: { roundId }, body: { userId, data: "Pineapple" } },
+        userId,
+      ),
       res,
     );
 
@@ -60,12 +71,18 @@ describe("submitGuess", () => {
 
   it("rejects guesses on a finalized round", async () => {
     const database = createMockDb({
-      selectResult: [{ game: gameId, guesses: [], winningGuess: guessId }],
+      selectResults: [
+        [{ game: gameId, guesses: [], winningGuess: guessId }],
+        [{ participants: [userId] }],
+      ],
     });
     const { res, state } = createMockResponse();
 
     await submitGuess(createMockConfig(database)).handler(
-      { params: { roundId }, body: { userId, data: "Pepperoni" } },
+      await authenticatedRequest(
+        { params: { roundId }, body: { userId, data: "Pepperoni" } },
+        userId,
+      ),
       res,
     );
 
@@ -80,11 +97,14 @@ describe("submitGuess", () => {
     const { res, state } = createMockResponse();
 
     await submitGuess(createMockConfig(database)).handler(
-      { params: { roundId }, body: { userId, data: "Pepperoni" } },
+      await authenticatedRequest(
+        { params: { roundId }, body: { userId, data: "Pepperoni" } },
+        userId,
+      ),
       res,
     );
 
-    expect(state.statusCode).toBe(400);
-    expect(state.body).toMatchObject({ ok: false, code: "INVALID_PLAYER" });
+    expect(state.statusCode).toBe(403);
+    expect(state.body).toMatchObject({ ok: false, code: "FORBIDDEN" });
   });
 });
