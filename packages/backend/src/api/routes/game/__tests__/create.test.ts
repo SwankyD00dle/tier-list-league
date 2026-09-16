@@ -1,6 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { REQUEST_SCHEMA_FAILURE_CODE } from "../../../route-helper";
-import { createMockConfig, createMockDb, createMockResponse } from "../../../test-helpers";
+import {
+  authenticatedRequest,
+  createMockConfig,
+  createMockDb,
+  createMockResponse,
+} from "../../../test-helpers";
 import { createGame } from "../create";
 
 const creatorId = "550e8400-e29b-41d4-a716-446655440000";
@@ -9,62 +14,69 @@ const gameId = "550e8400-e29b-41d4-a716-446655440002";
 const createdAt = new Date("2026-01-01T00:00:00.000Z");
 
 describe("createGame", () => {
-  it("creates a game, dedupes the creator, and returns 201", async () => {
-    const database = createMockDb({
-      selectResult: [{ id: creatorId }, { id: playerId }],
-      insertResult: [
-        {
+  it.each([false, true])(
+    "creates a game for the authenticated user (legacy caller identities: %s)",
+    async (legacyIdentity) => {
+      const values = vi.fn();
+      const database = createMockDb({
+        onInsertValues: values,
+        selectResult: [{ id: creatorId }],
+        insertResult: [
+          {
+            id: gameId,
+            name: "Season 1",
+            description: "First season",
+            participants: [creatorId],
+            roundCount: 5,
+            rounds: [],
+            createdBy: creatorId,
+            createdAt,
+            updatedAt: createdAt,
+          },
+        ],
+      });
+      const { res, state } = createMockResponse();
+
+      await createGame(createMockConfig(database)).handler(
+        await authenticatedRequest({
+          body: {
+            name: "Season 1",
+            description: "First season",
+            roundCount: 5,
+            ...(legacyIdentity ? { createdBy: playerId, participants: [playerId] } : {}),
+          },
+        }),
+        res,
+      );
+
+      expect(state.statusCode).toBe(201);
+      expect(state.body).toEqual({
+        ok: true,
+        game: {
           id: gameId,
           name: "Season 1",
           description: "First season",
-          participants: [creatorId, playerId],
+          participants: [creatorId],
           roundCount: 5,
           rounds: [],
           createdBy: creatorId,
-          createdAt,
-          updatedAt: createdAt,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
         },
-      ],
-    });
+      });
+      expect(database.update).toHaveBeenCalledOnce();
+      expect(values).toHaveBeenCalledWith(
+        expect.objectContaining({ createdBy: creatorId, participants: [creatorId] }),
+      );
+    },
+  );
+
+  it("rejects a session whose user no longer exists", async () => {
+    const database = createMockDb({ selectResult: [] });
     const { res, state } = createMockResponse();
 
     await createGame(createMockConfig(database)).handler(
-      {
-        body: {
-          name: "Season 1",
-          description: "First season",
-          roundCount: 5,
-          createdBy: creatorId,
-          participants: [creatorId, playerId],
-        },
-      },
-      res,
-    );
-
-    expect(state.statusCode).toBe(201);
-    expect(state.body).toEqual({
-      ok: true,
-      game: {
-        id: gameId,
-        name: "Season 1",
-        description: "First season",
-        participants: [creatorId, playerId],
-        roundCount: 5,
-        rounds: [],
-        createdBy: creatorId,
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-      },
-    });
-    expect(database.update).toHaveBeenCalledOnce();
-  });
-
-  it("rejects unknown participants", async () => {
-    const database = createMockDb({ selectResult: [{ id: creatorId }] });
-    const { res, state } = createMockResponse();
-
-    await createGame(createMockConfig(database)).handler(
-      {
+      await authenticatedRequest({
         body: {
           name: "Season 1",
           description: "First season",
@@ -72,7 +84,7 @@ describe("createGame", () => {
           createdBy: creatorId,
           participants: [playerId],
         },
-      },
+      }),
       res,
     );
 
@@ -87,7 +99,10 @@ describe("createGame", () => {
   it("validates the body", async () => {
     const { res, state } = createMockResponse();
 
-    await createGame(createMockConfig()).handler({ body: { name: "" } }, res);
+    await createGame(createMockConfig()).handler(
+      await authenticatedRequest({ body: { name: "" } }),
+      res,
+    );
 
     expect(state.statusCode).toBe(400);
     expect(state.body).toMatchObject({ ok: false, code: REQUEST_SCHEMA_FAILURE_CODE });

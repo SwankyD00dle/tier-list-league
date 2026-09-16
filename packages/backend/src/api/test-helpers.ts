@@ -1,7 +1,11 @@
+import type { SQL } from "drizzle-orm";
 import { vi } from "vitest";
 import type { db } from "../database/client";
+import { ACCESS_TOKEN_COOKIE } from "./auth/cookies";
+import { signAccessToken } from "./auth/tokens";
 import type { BaseHandlerConfig, Logger } from "./handler";
 import type { ApiRequest, ApiResponse } from "./route-helper";
+import { resetAuthConfigCache } from "./routes/auth/config";
 
 export function createMockLogger(): Logger {
   return {
@@ -80,6 +84,8 @@ export function createMockDb(options?: {
   insertResult?: unknown[];
   updateResult?: unknown[];
   executeError?: Error;
+  onSelectWhere?: (condition: SQL | undefined) => void;
+  onInsertValues?: (values: unknown) => void;
 }): typeof db {
   const selectResults = [...(options?.selectResults ?? [options?.selectResult ?? []])];
   const insertResult = options?.insertResult ?? [];
@@ -88,7 +94,11 @@ export function createMockDb(options?: {
   const createSelectChain = (selectResult: unknown[]) => {
     const promise = Promise.resolve(selectResult);
     return Object.assign(promise, {
-      where: () => createSelectChain(selectResult),
+      where: vi.fn((condition: SQL | undefined) => {
+        options?.onSelectWhere?.(condition);
+        return createSelectChain(selectResult);
+      }),
+      innerJoin: () => createSelectChain(selectResult),
       limit: () => promise,
       orderBy: () => promise,
     });
@@ -99,9 +109,10 @@ export function createMockDb(options?: {
       from: vi.fn(() => createSelectChain(selectResults.shift() ?? [])),
     })),
     insert: vi.fn(() => ({
-      values: vi.fn(() => ({
-        returning: vi.fn(() => Promise.resolve(insertResult)),
-      })),
+      values: vi.fn((values: unknown) => {
+        options?.onInsertValues?.(values);
+        return { returning: vi.fn(() => Promise.resolve(insertResult)) };
+      }),
     })),
     update: vi.fn(() => ({
       set: vi.fn(() => ({
@@ -135,4 +146,23 @@ export function createMockConfig(
 
 export function emptyRequest(): ApiRequest {
   return {};
+}
+
+/** Real signed cookies for gameplay route tests; no auth middleware is mocked. */
+export async function authenticatedRequest(
+  req: ApiRequest = {},
+  userId = "550e8400-e29b-41d4-a716-446655440000",
+): Promise<ApiRequest> {
+  vi.stubEnv("DISCORD_CLIENT_ID", "test-client");
+  vi.stubEnv("DISCORD_CLIENT_SECRET", "test-client-secret");
+  vi.stubEnv("DISCORD_REDIRECT_URI", "http://localhost:3000/api/auth/discord/callback");
+  vi.stubEnv("JWT_SECRET", "test-only-jwt-secret-with-at-least-32-characters");
+  resetAuthConfigCache();
+  return {
+    ...req,
+    headers: {
+      ...req.headers,
+      cookie: `${ACCESS_TOKEN_COOKIE}=${await signAccessToken({ sub: userId, discordUserId: "test-discord-user" })}`,
+    },
+  };
 }

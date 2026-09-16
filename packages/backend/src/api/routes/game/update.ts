@@ -6,6 +6,8 @@ import {
 } from "@tier-list-league/api-schema";
 import { eq } from "drizzle-orm";
 import game from "../../../database/schema/game";
+import { forbiddenResponse } from "../../auth/game-access";
+import { requireAuth } from "../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../handler";
 import {
   type ApiRequest,
@@ -22,6 +24,10 @@ export const updateGame = (config: BaseHandlerConfig) =>
     request: updateGameRequestSchema,
     response: updateGameResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<UpdateGameResponse>) => {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
       if (!isUpdateGameRequest(req)) {
         return requestSchemaFailure(res);
       }
@@ -36,6 +42,17 @@ export const updateGame = (config: BaseHandlerConfig) =>
       }
 
       try {
+        const [existing] = await config.db
+          .select({ createdBy: game.createdBy })
+          .from(game)
+          .where(eq(game.id, req.params.id))
+          .limit(1);
+        if (!existing) {
+          return res.status(404).json({ ok: false, code: "NOT_FOUND", message: "Game not found" });
+        }
+        if (existing.createdBy !== auth.sub) {
+          return forbiddenResponse(res);
+        }
         const [updated] = await config.db
           .update(game)
           .set({

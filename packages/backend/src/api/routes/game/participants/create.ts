@@ -7,6 +7,8 @@ import {
 import { eq, sql } from "drizzle-orm";
 import game from "../../../../database/schema/game";
 import user from "../../../../database/schema/user";
+import { forbiddenResponse } from "../../../auth/game-access";
+import { requireAuth } from "../../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../../handler";
 import {
   type ApiRequest,
@@ -23,6 +25,10 @@ export const addParticipant = (config: BaseHandlerConfig) =>
     request: addParticipantRequestSchema,
     response: participantsResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<ParticipantsResponse>) => {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
       if (!isAddParticipantRequest(req)) {
         return requestSchemaFailure(res);
       }
@@ -33,12 +39,15 @@ export const addParticipant = (config: BaseHandlerConfig) =>
       try {
         const result = await config.db.transaction(async (tx) => {
           const [gameRow] = await tx
-            .select({ participants: game.participants })
+            .select({ createdBy: game.createdBy, participants: game.participants })
             .from(game)
             .where(eq(game.id, gameId))
             .limit(1);
           if (!gameRow) {
             return { error: "GAME_NOT_FOUND" as const };
+          }
+          if (gameRow.createdBy !== auth.sub) {
+            return { forbidden: true };
           }
           if (gameRow.participants.includes(userId)) {
             return { error: "ALREADY_PARTICIPANT" as const };
@@ -66,6 +75,9 @@ export const addParticipant = (config: BaseHandlerConfig) =>
           return { participants };
         });
 
+        if ("forbidden" in result) {
+          return forbiddenResponse(res);
+        }
         if ("error" in result && result.error !== undefined) {
           return participantErrorResponse(res, result.error);
         }

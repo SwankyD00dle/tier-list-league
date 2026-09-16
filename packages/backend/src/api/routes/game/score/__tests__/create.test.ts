@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { REQUEST_SCHEMA_FAILURE_CODE } from "../../../../route-helper";
 import {
+  authenticatedRequest,
   createMockConfig,
   createMockDb,
   createMockLogger,
@@ -65,7 +66,10 @@ describe("recordGameScore", () => {
     });
     const { res, state } = createMockResponse();
 
-    await recordGameScore(createMockConfig(database)).handler(request(), res);
+    await recordGameScore(createMockConfig(database)).handler(
+      await authenticatedRequest(request(), hostId),
+      res,
+    );
 
     expect(state.statusCode).toBe(200);
     expect(state.body).toEqual({
@@ -131,7 +135,7 @@ describe("recordGameScore", () => {
     const { res, state } = createMockResponse();
 
     await recordGameScore(createMockConfig(database)).handler(
-      request({ honorableGuess: winningGuess }),
+      await authenticatedRequest(request({ honorableGuess: winningGuess }), hostId),
       res,
     );
 
@@ -153,7 +157,10 @@ describe("recordGameScore", () => {
     });
     const { res, state } = createMockResponse();
 
-    await recordGameScore(createMockConfig(database)).handler(request({ hostedBy: winnerId }), res);
+    await recordGameScore(createMockConfig(database)).handler(
+      await authenticatedRequest(request({ hostedBy: winnerId }), winnerId),
+      res,
+    );
 
     expect(state.statusCode).toBe(403);
     expect(state.body).toEqual({
@@ -168,7 +175,7 @@ describe("recordGameScore", () => {
     const { res, state } = createMockResponse();
 
     await recordGameScore(createMockConfig(createMockDb(), log)).handler(
-      { params: { gameId }, body: { round: { id: "bad" } } },
+      await authenticatedRequest({ params: { gameId }, body: { round: { id: "bad" } } }, hostId),
       res,
     );
 

@@ -9,6 +9,8 @@ import { and, eq, inArray } from "drizzle-orm";
 import game from "../../../../database/schema/game";
 import round from "../../../../database/schema/round";
 import tierList from "../../../../database/schema/tier-list";
+import { forbiddenResponse } from "../../../auth/game-access";
+import { requireAuth } from "../../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../../handler";
 import {
   type ApiRequest,
@@ -26,12 +28,19 @@ export const submitTierList = (config: BaseHandlerConfig) =>
     request: submitTierListRequestSchema,
     response: submitTierListResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<SubmitTierListResponse>) => {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
       if (!isSubmitTierListRequest(req)) {
         return requestSchemaFailure(res);
       }
 
       const { roundId } = req.params;
       const { userId, data } = req.body;
+      if (userId !== auth.sub) {
+        return forbiddenResponse(res);
+      }
 
       try {
         const result = await config.db.transaction(async (tx) => {
@@ -49,9 +58,6 @@ export const submitTierList = (config: BaseHandlerConfig) =>
           if (!roundRow) {
             return { error: "ROUND_NOT_FOUND" as const };
           }
-          if (roundRow.winningGuess !== null) {
-            return { error: "ROUND_FINALIZED" as const };
-          }
           if (roundRow.game === null) {
             return { error: "PLAYER_NOT_IN_GAME" as const };
           }
@@ -63,6 +69,9 @@ export const submitTierList = (config: BaseHandlerConfig) =>
             .limit(1);
           if (!gameRow?.participants.includes(userId)) {
             return { error: "PLAYER_NOT_IN_GAME" as const };
+          }
+          if (roundRow.winningGuess !== null) {
+            return { error: "ROUND_FINALIZED" as const };
           }
 
           const isHost = roundRow.hostedBy === userId;
@@ -165,9 +174,9 @@ function tierListErrorResponse(
         message: "Tier lists cannot change after a round is finalized",
       });
     case "PLAYER_NOT_IN_GAME":
-      return res.status(400).json({
+      return res.status(403).json({
         ok: false,
-        code: "INVALID_PLAYER",
+        code: "FORBIDDEN",
         message: "Only game participants can submit tier lists",
       });
     case "INSERT_FAILED":

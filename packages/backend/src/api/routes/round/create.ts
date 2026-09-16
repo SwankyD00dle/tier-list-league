@@ -8,6 +8,8 @@ import {
 import { eq } from "drizzle-orm";
 import game from "../../../database/schema/game";
 import round from "../../../database/schema/round";
+import { forbiddenResponse } from "../../auth/game-access";
+import { requireAuth } from "../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../handler";
 import {
   type ApiRequest,
@@ -25,6 +27,10 @@ export const createRound = (config: BaseHandlerConfig) =>
     request: createRoundRequestSchema,
     response: createRoundResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<CreateRoundResponse>) => {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
       if (!isCreateRoundRequest(req)) {
         return requestSchemaFailure(res);
       }
@@ -35,12 +41,19 @@ export const createRound = (config: BaseHandlerConfig) =>
       try {
         const result = await config.db.transaction(async (tx) => {
           const [gameRow] = await tx
-            .select({ participants: game.participants, rounds: game.rounds })
+            .select({
+              createdBy: game.createdBy,
+              participants: game.participants,
+              rounds: game.rounds,
+            })
             .from(game)
             .where(eq(game.id, gameId))
             .limit(1);
           if (!gameRow) {
             return { error: "GAME_NOT_FOUND" as const };
+          }
+          if (gameRow.createdBy !== auth.sub) {
+            return { forbidden: true };
           }
           if (!gameRow.participants.includes(hostedBy)) {
             return { error: "HOST_NOT_IN_GAME" as const };
@@ -69,6 +82,9 @@ export const createRound = (config: BaseHandlerConfig) =>
           return { created };
         });
 
+        if ("forbidden" in result) {
+          return forbiddenResponse(res);
+        }
         if ("error" in result && result.error !== undefined) {
           if (result.error === "GAME_NOT_FOUND") {
             return res

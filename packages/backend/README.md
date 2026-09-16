@@ -128,7 +128,7 @@ Score reads are keyed by user ID. Each player has a running `total` and only rou
 
 ### Gameplay mutations
 
-- Creating a game enrolls the creator plus any listed participants and keeps each user's `activeGames` in sync; participant add/remove does the same.
+- Creating a game enrolls the authenticated creator and keeps their `activeGames` in sync; admin-only participant add/remove does the same.
 - `POST /api/games/:gameId/rounds` assigns the next round number and links the round to the game; the host must be a participant.
 - Rounds are finalized through `POST /api/games/:gameId/score`; a finalized round rejects further round updates, guesses, and tier lists with `409 ROUND_FINALIZED`.
 - Guess and tier-list submissions upsert: resubmitting replaces that user's previous entry (`201` on create, `200` on replace). One guess per user per round is DB-enforced.
@@ -136,4 +136,29 @@ Score reads are keyed by user ID. Each player has a running `total` and only rou
 
 ### Remaining UI API gaps
 
-Authentication is the main gap: user IDs in request bodies are validated as invariants, but the server cannot yet verify the caller's identity. A composite game-state endpoint may also be useful if the UI otherwise needs several requests to render one game screen.
+A composite game-state endpoint may be useful if the UI otherwise needs several requests to render one game screen.
+
+## Gameplay authorization
+
+Every `/api/games`, `/api/rounds`, and `/api/tier-lists` handler requires a valid
+access-token cookie from Discord login. Missing, invalid, or expired cookies return
+`401 UNAUTHORIZED`; authenticated callers without the required role receive
+`403 FORBIDDEN` in the shared API error envelope.
+
+- `POST /api/games` accepts `{ name, description, roundCount }`. The session user is
+  the admin and sole initial participant. Legacy `createdBy`/`participants` fields
+  are ignored; add other users through the admin-only participant endpoint.
+- `GET /api/games` filters in the database to games the caller administers or
+  participates in. Clients do not need to fetch all games/users to filter access.
+- Only `game.createdBy` may edit game settings, manage participants, create rounds,
+  or edit round settings (including the assigned host).
+- Game, round, tier-list, and score reads require current game membership. An admin
+  who is no longer enrolled can still manage the game but cannot read participant
+  content. Orphaned rounds/tier lists are not publicly readable.
+- Guess and tier-list submission `userId` must match the session user, who must be
+  enrolled. Only the recorded round host's submission becomes the canonical list.
+- Finalizing awards requires `round.hostedBy` to match both the session user and
+  the recorded host. The game admin is not implicitly the round host.
+
+The typed frontend client inherits the reduced create-game body from the shared
+schema; submission and scoring callers should continue sending their own user ID.

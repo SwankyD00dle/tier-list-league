@@ -7,6 +7,8 @@ import {
 import { eq } from "drizzle-orm";
 import game from "../../../database/schema/game";
 import round from "../../../database/schema/round";
+import { forbiddenResponse, hasGameRole } from "../../auth/game-access";
+import { requireAuth } from "../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../handler";
 import {
   type ApiRequest,
@@ -24,6 +26,10 @@ export const updateRound = (config: BaseHandlerConfig) =>
     request: updateRoundRequestSchema,
     response: updateRoundResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<UpdateRoundResponse>) => {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
       if (!isUpdateRoundRequest(req)) {
         return requestSchemaFailure(res);
       }
@@ -47,6 +53,9 @@ export const updateRound = (config: BaseHandlerConfig) =>
             .limit(1);
           if (!existing) {
             return { error: "ROUND_NOT_FOUND" as const };
+          }
+          if (!(await hasGameRole(tx, existing.game, auth.sub, "admin"))) {
+            return { forbidden: true };
           }
           if (existing.winningGuess !== null) {
             return { error: "ROUND_FINALIZED" as const };
@@ -81,6 +90,9 @@ export const updateRound = (config: BaseHandlerConfig) =>
           return { updated };
         });
 
+        if ("forbidden" in result) {
+          return forbiddenResponse(res);
+        }
         if ("error" in result && result.error !== undefined) {
           if (result.error === "ROUND_NOT_FOUND") {
             return res

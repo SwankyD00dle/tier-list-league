@@ -7,6 +7,8 @@ import {
 import { eq } from "drizzle-orm";
 import type { db } from "../../../database/client";
 import game from "../../../database/schema/game";
+import { forbiddenResponse } from "../../auth/game-access";
+import { requireAuth } from "../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../handler";
 import {
   type ApiRequest,
@@ -23,6 +25,10 @@ export const getGame = (config: BaseHandlerConfig) =>
     request: getGameRequestSchema,
     response: getGameResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<GetGameResponse>) => {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
       if (!isGetGameRequest(req)) {
         return requestSchemaFailure(res);
       }
@@ -34,6 +40,10 @@ export const getGame = (config: BaseHandlerConfig) =>
           code: "NOT_FOUND",
           message: "Game not found",
         });
+      }
+
+      if (!found.participants.includes(auth.sub)) {
+        return forbiddenResponse(res);
       }
 
       return res.status(200).json({

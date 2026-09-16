@@ -9,6 +9,8 @@ import game from "../../../../database/schema/game";
 import guess from "../../../../database/schema/guess";
 import round from "../../../../database/schema/round";
 import scoreEntry from "../../../../database/schema/score-entry";
+import { forbiddenResponse } from "../../../auth/game-access";
+import { requireAuth } from "../../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../../handler";
 import {
   type ApiRequest,
@@ -26,12 +28,19 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
     request: recordGameScoreRequestSchema,
     response: recordGameScoreResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<RecordGameScoreResponse>) => {
+      const auth = await requireAuth(req, res);
+      if (!auth) {
+        return;
+      }
       if (!isRecordGameScoreRequest(req)) {
         return requestSchemaFailure(res);
       }
 
       const { gameId } = req.params;
       const input = req.body.round;
+      if (input.hostedBy !== auth.sub) {
+        return forbiddenResponse(res);
+      }
       const awardedGuessIds = [
         input.winningGuess,
         ...input.honorableMentions.map(({ guessId }) => guessId),
@@ -64,7 +73,7 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
           if (!roundRow || roundRow.game !== gameId) {
             return { error: "ROUND_NOT_FOUND" as const };
           }
-          if (roundRow.hostedBy !== input.hostedBy) {
+          if (roundRow.hostedBy !== auth.sub) {
             return { error: "HOST_MISMATCH" as const };
           }
 

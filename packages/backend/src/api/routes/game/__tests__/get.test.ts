@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { REQUEST_SCHEMA_FAILURE_CODE } from "../../../route-helper";
 import {
+  authenticatedRequest,
   createMockConfig,
   createMockDb,
   createMockResponse,
@@ -20,7 +21,7 @@ describe("getGame", () => {
           id: gameId,
           name: "Season 1",
           description: "First season",
-          participants: [],
+          participants: [gameId],
           roundCount: 1,
           rounds: [],
           createdBy: null,
@@ -32,7 +33,7 @@ describe("getGame", () => {
     const { res, state } = createMockResponse();
     const route = getGame(createMockConfig(database));
 
-    await route.handler({ params: { id: gameId } }, res);
+    await route.handler(await authenticatedRequest({ params: { id: gameId } }), res);
 
     expect(state.statusCode).toBe(200);
     expect(state.body).toEqual({
@@ -41,7 +42,7 @@ describe("getGame", () => {
         id: gameId,
         name: "Season 1",
         description: "First season",
-        participants: [],
+        participants: [gameId],
         roundCount: 1,
         rounds: [],
         createdBy: null,
@@ -55,7 +56,7 @@ describe("getGame", () => {
     const { res, state } = createMockResponse();
     const route = getGame(createMockConfig(createMockDb({ selectResult: [] })));
 
-    await route.handler({ params: { id: gameId } }, res);
+    await route.handler(await authenticatedRequest({ params: { id: gameId } }), res);
 
     expect(state.statusCode).toBe(404);
     expect(state.body).toEqual({
@@ -69,7 +70,7 @@ describe("getGame", () => {
     const { res, state } = createMockResponse();
     const route = getGame(createMockConfig());
 
-    await route.handler({ params: { id: "bad" } }, res);
+    await route.handler(await authenticatedRequest({ params: { id: "bad" } }), res);
 
     expect(state.statusCode).toBe(400);
     expect(state.body).toMatchObject({
@@ -82,7 +83,7 @@ describe("getGame", () => {
     const { res, state } = createMockResponse();
     const route = getGame(createMockConfig());
 
-    await route.handler(emptyRequest(), res);
+    await route.handler(await authenticatedRequest(emptyRequest()), res);
 
     expect(state.statusCode).toBe(400);
     expect(state.body).toMatchObject({

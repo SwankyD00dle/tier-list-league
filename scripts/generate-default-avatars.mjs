@@ -18,10 +18,22 @@ const TONGUE = "#ff5d73";
 
 // 16 bright, evenly spread background colors (Tailwind 500 family).
 const BACKGROUNDS = [
-  "#ef4444", "#f97316", "#f59e0b", "#eab308",
-  "#84cc16", "#22c55e", "#10b981", "#14b8a6",
-  "#06b6d4", "#3b82f6", "#6366f1", "#8b5cf6",
-  "#a855f7", "#d946ef", "#ec4899", "#f43f5e",
+  "#ef4444",
+  "#f97316",
+  "#f59e0b",
+  "#eab308",
+  "#84cc16",
+  "#22c55e",
+  "#10b981",
+  "#14b8a6",
+  "#06b6d4",
+  "#3b82f6",
+  "#6366f1",
+  "#8b5cf6",
+  "#a855f7",
+  "#d946ef",
+  "#ec4899",
+  "#f43f5e",
 ];
 
 function darken(hex, factor = 0.72) {
@@ -73,10 +85,22 @@ const mouths = {
 };
 
 const COMBOS = [
-  ["dots", "smile"], ["happy", "grin"], ["wide", "open"], ["dots", "flat"],
-  ["sleepy", "smile"], ["angry", "flat"], ["wide", "smile"], ["happy", "open"],
-  ["dots", "grin"], ["wink", "smirk"], ["wide", "tongue"], ["sleepy", "flat"],
-  ["angry", "open"], ["dots", "smirk"], ["happy", "smile"], ["wide", "grin"],
+  ["dots", "smile"],
+  ["happy", "grin"],
+  ["wide", "open"],
+  ["dots", "flat"],
+  ["sleepy", "smile"],
+  ["angry", "flat"],
+  ["wide", "smile"],
+  ["happy", "open"],
+  ["dots", "grin"],
+  ["wink", "smirk"],
+  ["wide", "tongue"],
+  ["sleepy", "flat"],
+  ["angry", "open"],
+  ["dots", "smirk"],
+  ["happy", "smile"],
+  ["wide", "grin"],
 ];
 
 export function buildAvatarSvg(index) {
@@ -100,7 +124,10 @@ async function main() {
   await mkdir(outDir, { recursive: true });
   for (let index = 0; index < DEFAULT_AVATAR_COUNT; index += 1) {
     const name = String(index).padStart(2, "0");
-    await writeFile(new URL(`${name}.svg`, `file://${outDir.endsWith("/") ? outDir : `${outDir}/`}`), buildAvatarSvg(index));
+    await writeFile(
+      new URL(`${name}.svg`, `file://${outDir.endsWith("/") ? outDir : `${outDir}/`}`),
+      buildAvatarSvg(index),
+    );
   }
   console.log(`Wrote ${DEFAULT_AVATAR_COUNT} avatars to ${outDir}`);
 }

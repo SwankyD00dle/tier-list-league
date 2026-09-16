@@ -72,6 +72,7 @@ export const routes = {
 };
 
 export type CreateUserBody = CreateUserRequest["body"];
+/** Caller identity and initial membership come from the access-token cookie. */
 export type CreateGameBody = CreateGameRequest["body"];
 export type UpdateGameBody = UpdateGameRequest["body"];
 export type AddParticipantBody = AddParticipantRequest["body"];
