@@ -6,7 +6,7 @@ import type {
   MeResponse,
 } from "@tier-list-league/api-schema";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
-import { api, routes } from "@/api/api";
+import { api, apiUrl, routes } from "@/api/api";
 import { CreateGameModal } from "./CreateGameModal";
 import { GameCard } from "./GameCard";
 
@@ -69,7 +69,7 @@ export default function GamesPage() {
         <h1 className="font-bold text-3xl tracking-tight">Your games</h1>
         <p className="text-gray-600">Log in with Discord to see your games.</p>
         <a
-          href={routes.discordAuth}
+          href={apiUrl(routes.discordAuth)}
           className="rounded-lg bg-[#5865F2] px-4 py-2 font-medium text-white"
         >
           Log In with Discord
@@ -115,12 +115,7 @@ export default function GamesPage() {
     content = (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {games.map((game) => (
-          <GameCard
-            key={game.id}
-            game={game}
-            currentUserId={user.id}
-            usersById={usersById}
-          />
+          <GameCard key={game.id} game={game} currentUserId={user.id} usersById={usersById} />
         ))}
       </div>
     );

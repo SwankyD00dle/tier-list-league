@@ -46,7 +46,7 @@ export const discordCallback = (config: BaseHandlerConfig) =>
         const { code, state, error } = req.query;
         if (error !== undefined) {
           log.error({ error }, "Discord OAuth error");
-          return res.redirect(`${frontendUrl}/?authError=discord`);
+          return res.redirect(`${frontendUrl.replace(/\/$/, "")}/?authError=discord`);
         }
 
         if (code === undefined || code === "" || state === undefined || state === "") {
@@ -99,7 +99,7 @@ export const discordCallback = (config: BaseHandlerConfig) =>
         );
 
         log.info({ id: upserted.id, discordUserId: upserted.discordUserId }, "Discord login");
-        return res.redirect(`${frontendUrl}/`);
+        return res.redirect(`${frontendUrl.replace(/\/$/, "")}/`);
       } catch (error) {
         log.error({ error: String(error) }, "Discord callback error");
         return res.status(500).json({

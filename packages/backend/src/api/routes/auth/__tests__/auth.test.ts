@@ -58,12 +58,27 @@ describe("auth routes", () => {
     ).toBe(true);
   });
 
-  it("completes Discord callback, upserts user, and sets auth cookies", async () => {
+  it.each([
+    "http://localhost:3000",
+    "http://localhost:3000/",
+    "https://example.test/ingress/app-19",
+    "https://example.test/ingress/app-19/",
+  ])("completes Discord callback under %s and sets auth cookies", async (frontendUrl) => {
+    process.env.FRONTEND_URL = frontendUrl;
+    process.env.DISCORD_REDIRECT_URI = `${frontendUrl.replace(/\/$/, "")}/api/auth/discord/callback`;
+    const { res: authRes, state: authState } = createMockResponse();
+    await startDiscordAuth(createMockConfig()).handler({}, authRes);
+    expect(new URL(authState.redirectUrl ?? "").searchParams.get("redirect_uri")).toBe(
+      process.env.DISCORD_REDIRECT_URI,
+    );
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: string | URL | Request) => {
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
         const url = String(input);
         if (url.includes("/oauth2/token")) {
+          expect(new URLSearchParams(String(init?.body)).get("redirect_uri")).toBe(
+            process.env.DISCORD_REDIRECT_URI,
+          );
           return new Response(JSON.stringify({ access_token: "discord-access" }), {
             status: 200,
             headers: { "content-type": "application/json" },
@@ -101,7 +116,7 @@ describe("auth routes", () => {
     );
 
     expect(state.statusCode).toBe(302);
-    expect(state.redirectUrl).toBe("http://localhost:3000/");
+    expect(state.redirectUrl).toBe(`${frontendUrl.replace(/\/$/, "")}/`);
     expect(
       state.cookies.some((cookie: string) => cookie.startsWith(`${ACCESS_TOKEN_COOKIE}=`)),
     ).toBe(true);
@@ -109,6 +124,16 @@ describe("auth routes", () => {
       state.cookies.some((cookie: string) => cookie.startsWith(`${REFRESH_TOKEN_COOKIE}=`)),
     ).toBe(true);
   });
+
+  it.each(["https://example.test", "https://example.test/ingress/app-19/"])(
+    "retains public pathname on Discord cancellation under %s",
+    async (frontendUrl) => {
+      process.env.FRONTEND_URL = frontendUrl;
+      const { res, state } = createMockResponse();
+      await discordCallback(createMockConfig()).handler({ query: { error: "access_denied" } }, res);
+      expect(state.redirectUrl).toBe(`${frontendUrl.replace(/\/$/, "")}/?authError=discord`);
+    },
+  );
 
   it("rejects callback when oauth state mismatches", async () => {
     const { res, state } = createMockResponse();

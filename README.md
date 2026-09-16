@@ -39,3 +39,10 @@ npm run dev         # frontend + backend; public origin is localhost:3000
 npm run check       # biome lint + format check
 npm run typecheck   # type-check every workspace
 ```
+
+## Prefixed production URLs
+
+For an ingress-mounted app, set the full `APP_PUBLIC_URL` (including its pathname) during
+frontend build and start. Forward that pathname intact to Next; configure backend OAuth URLs
+with the same prefix. See [frontend production routing](packages/frontend/README.md#production-behind-an-ingress-prefix)
+for configuration and root/prefixed production verification commands.

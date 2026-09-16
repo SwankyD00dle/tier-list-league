@@ -3,7 +3,7 @@
 import type { MeResponse } from "@tier-list-league/api-schema";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { api, routes } from "@/api/api";
+import { api, apiUrl, routes } from "@/api/api";
 
 export default function Home() {
   const [user, setUser] = useState<MeResponse | null>(null);
@@ -63,7 +63,7 @@ export default function Home() {
         <>
           <p className="text-gray-600 text-lg">Log in with Discord to get started.</p>
           <a
-            href={routes.discordAuth}
+            href={apiUrl(routes.discordAuth)}
             className="rounded-lg bg-[#5865F2] px-4 py-2 font-medium text-white"
           >
             Log In with Discord

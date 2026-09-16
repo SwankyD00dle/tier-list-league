@@ -36,7 +36,13 @@ import {
  * Same-origin by default: `next.config.ts` rewrites `/api/*` to the backend. Set
  * `NEXT_PUBLIC_API_BASE_URL` to call the backend directly (for example from a server component).
  */
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_BASE_PATH || "";
+
+// Plain anchors and fetch do not receive Next Link's automatic basePath handling.
+export function apiUrl(path: string): string {
+  return `${API_BASE_URL}${path}`;
+}
 
 const NETWORK_FAILURE_CODE = "NETWORK_FAILURE";
 const RESPONSE_SCHEMA_FAILURE_CODE = "RESPONSE_SCHEMA_VALIDATION_FAILURE";
@@ -152,7 +158,7 @@ async function request<TData>(
   isResponse: TypeCheck<TData>,
 ): Promise<ApiResult<TData>> {
   try {
-    const response = await fetch(`${API_BASE_URL}${path}`, init);
+    const response = await fetch(apiUrl(path), init);
     const payload = await readJson(response);
 
     if (isResponse(payload)) {
