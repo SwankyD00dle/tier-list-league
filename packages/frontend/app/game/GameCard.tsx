@@ -1,4 +1,5 @@
 import type { ListGamesResponse, ListUsersResponse } from "@tier-list-league/api-schema";
+import Link from "next/link";
 import { Avatar } from "./Avatar";
 
 type Game = ListGamesResponse["games"][number];
@@ -41,7 +42,14 @@ export function GameCard({ game, currentUserId, usersById, needsAction = false }
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate font-semibold text-gray-900 text-lg">{game.name}</h2>
+          <h2 className="truncate font-semibold text-gray-900 text-lg">
+            <Link
+              href={`/game/${encodeURIComponent(game.id)}`}
+              className="hover:underline focus-visible:outline-2 focus-visible:outline-[#5865F2]"
+            >
+              {game.name}
+            </Link>
+          </h2>
           {game.description ? (
             <p className="mt-1 line-clamp-2 text-gray-500 text-sm">{game.description}</p>
           ) : null}

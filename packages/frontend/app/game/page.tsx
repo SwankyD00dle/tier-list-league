@@ -5,6 +5,7 @@ import type {
   ListUsersResponse,
   MeResponse,
 } from "@tier-list-league/api-schema";
+import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { api, apiUrl, routes } from "@/api/api";
 import { CreateGameModal } from "./CreateGameModal";
@@ -15,6 +16,7 @@ type UserSummary = ListUsersResponse["users"][number];
 type LoadState = "loading" | "ready" | "error";
 
 export default function GamesPage() {
+  const router = useRouter();
   const [user, setUser] = useState<MeResponse | null>(null);
   const [games, setGames] = useState<Game[]>([]);
   const [usersById, setUsersById] = useState<Map<string, UserSummary>>(new Map());
@@ -151,10 +153,9 @@ export default function GamesPage() {
       {creating ? (
         <CreateGameModal
           onClose={() => setCreating(false)}
-          onCreated={() => {
+          onCreated={(gameId) => {
             setCreating(false);
-            setState("loading");
-            void load();
+            router.push(`/game/${encodeURIComponent(gameId)}`);
           }}
         />
       ) : null}

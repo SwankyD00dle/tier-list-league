@@ -5,7 +5,7 @@ import { api } from "@/api/api";
 
 type CreateGameModalProps = {
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (gameId: string) => void;
 };
 
 const DEFAULT_ROUND_COUNT = 3;
@@ -38,7 +38,7 @@ export function CreateGameModal({ onClose, onCreated }: CreateGameModalProps) {
     });
 
     if (result.ok) {
-      onCreated();
+      onCreated(result.data.game.id);
       return;
     }
 
