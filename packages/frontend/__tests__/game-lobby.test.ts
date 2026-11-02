@@ -146,7 +146,11 @@ describe("game lobby", () => {
     fireEvent.change(screen.getByLabelText("Host"), { target: { value: admin.id } });
     fireEvent.click(screen.getByRole("button", { name: "Start first round" }));
     expect(await screen.findByText("Round 1: Snacks")).toBeTruthy();
-    expect(api.createRound).toHaveBeenCalledWith(game.id, { topic: "Snacks", hostedBy: admin.id });
+    expect(api.createRound).toHaveBeenCalledWith(game.id, {
+      topic: "Snacks",
+      hostedBy: admin.id,
+      expectedRoundCount: 0,
+    });
     expect(screen.queryByRole("button", { name: "Start first round" })).toBeNull();
   });
 
@@ -173,6 +177,72 @@ describe("game lobby", () => {
     expect(
       screen.getByText("No rounds yet. Waiting for the admin to start the game."),
     ).toBeTruthy();
+  });
+
+  it("loads historical host names for a remaining member", async () => {
+    const formerHost = { ...admin, id: "former-host", name: "Taylor" };
+    vi.mocked(api.me).mockResolvedValue({ ok: true, status: 200, data: { ...player, ok: true } });
+    vi.mocked(api.getGame).mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: {
+        ok: true,
+        game: { ...game, participants: [admin.id, player.id], rounds: [round.id] },
+      },
+    });
+    vi.mocked(api.getRound).mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: { ok: true, round: { ...round, hostedBy: formerHost.id, winningGuess: "winner" } },
+    });
+    vi.mocked(api.getUser).mockImplementation(async (id) => ({
+      ok: true,
+      status: 200,
+      data: { ok: true, user: id === admin.id ? admin : id === player.id ? player : formerHost },
+    }));
+    await renderLobby();
+    expect(screen.getByText("Host: Taylor · Finalized")).toBeTruthy();
+    expect(api.getUser).toHaveBeenCalledTimes(3);
+    expect(api.getUser).toHaveBeenCalledWith(formerHost.id);
+    expect(api.listUsers).not.toHaveBeenCalled();
+  });
+
+  it.each([null, "winner"])(
+    "only protects hosts of unfinished rounds (%s)",
+    async (winningGuess) => {
+      vi.mocked(api.getGame).mockResolvedValue({
+        ok: true,
+        status: 200,
+        data: {
+          ok: true,
+          game: { ...game, participants: [admin.id, player.id], rounds: [round.id] },
+        },
+      });
+      vi.mocked(api.getRound).mockResolvedValue({
+        ok: true,
+        status: 200,
+        data: { ok: true, round: { ...round, hostedBy: player.id, winningGuess } },
+      });
+      await renderLobby();
+      expect(screen.getByRole("button", { name: "Remove Sam" })).toHaveProperty(
+        "disabled",
+        winningGuess === null,
+      );
+    },
+  );
+
+  it("shows a conflict from a stale first-round form", async () => {
+    vi.mocked(api.createRound).mockResolvedValue({
+      ok: false,
+      status: 409,
+      code: "ROUND_COUNT_CHANGED",
+      message: "The game has already advanced. Reload the lobby to see its rounds.",
+    });
+    await renderLobby();
+    fireEvent.change(screen.getByLabelText("Topic"), { target: { value: "Snacks" } });
+    fireEvent.change(screen.getByLabelText("Host"), { target: { value: admin.id } });
+    fireEvent.click(screen.getByRole("button", { name: "Start first round" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("already advanced");
   });
 
   it.each([401, 403, 404])("handles game read status %i", async (status) => {

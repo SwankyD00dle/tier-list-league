@@ -55,10 +55,26 @@ export default function GameLobbyPage() {
         return;
       }
       const game = gameResult.data.game;
-      const [usersResult, roundResults] = await Promise.all([
+      const roundResults = await Promise.all(game.rounds.map((roundId) => api.getRound(roundId)));
+      if (cancelled) return;
+      const roundFailure = roundResults.find((result) => !result.ok);
+      if (roundFailure && !roundFailure.ok) {
+        setState({ kind: "error", status: roundFailure.status, message: roundFailure.message });
+        return;
+      }
+      const rounds = roundResults
+        .flatMap((result) => (result.ok ? [result.data.round] : []))
+        .sort((a, b) => a.roundNumber - b.roundNumber);
+      const userIds = [
+        ...new Set([
+          ...game.participants,
+          ...rounds.flatMap((round) => (round.hostedBy ? [round.hostedBy] : [])),
+        ]),
+      ];
+      const usersResult =
         game.createdBy === me.data.id
-          ? api.listUsers()
-          : Promise.all(game.participants.map((userId) => api.getUser(userId))).then(
+          ? await api.listUsers()
+          : await Promise.all(userIds.map((userId) => api.getUser(userId))).then(
               (results): ApiResult<ListUsersResponse> => {
                 const failure = results.find((result) => !result.ok);
                 if (failure && !failure.ok) return failure;
@@ -71,25 +87,19 @@ export default function GameLobbyPage() {
                   },
                 };
               },
-            ),
-        Promise.all(game.rounds.map((roundId) => api.getRound(roundId))),
-      ]);
+            );
       if (cancelled) return;
-      const failure = !usersResult.ok ? usersResult : roundResults.find((result) => !result.ok);
-      if (failure && !failure.ok) {
-        setState({ kind: "error", status: failure.status, message: failure.message });
+      if (!usersResult.ok) {
+        setState({ kind: "error", status: usersResult.status, message: usersResult.message });
         return;
       }
-      if (!usersResult.ok) return;
       setState({
         kind: "ready",
         lobby: {
           user: me.data,
           game,
           users: usersResult.data.users,
-          rounds: roundResults
-            .flatMap((result) => (result.ok ? [result.data.round] : []))
-            .sort((a, b) => a.roundNumber - b.roundNumber),
+          rounds,
         },
       });
     }
@@ -117,7 +127,7 @@ export default function GameLobbyPage() {
     event.preventDefault();
     if (!topic.trim() || !hostId) return;
     void mutate(
-      () => api.createRound(id, { topic: topic.trim(), hostedBy: hostId }),
+      () => api.createRound(id, { topic: topic.trim(), hostedBy: hostId, expectedRoundCount: 0 }),
       () => {
         setTopic("");
         setHostId("");
@@ -201,7 +211,12 @@ export default function GameLobbyPage() {
                     {isAdmin && userId !== lobby.user.id ? (
                       <button
                         type="button"
-                        disabled={busy}
+                        disabled={
+                          busy ||
+                          lobby.rounds.some(
+                            (round) => round.hostedBy === userId && !round.winningGuess,
+                          )
+                        }
                         className="rounded-lg border border-gray-300 px-3 py-1 text-sm disabled:opacity-50"
                         aria-label={`Remove ${name(userId)}`}
                         onClick={() => void mutate(() => api.removeParticipant(id, userId))}

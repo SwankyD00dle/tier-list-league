@@ -4,8 +4,9 @@ import {
   participantsResponseSchema,
   removeParticipantRequestSchema,
 } from "@tier-list-league/api-schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import game from "../../../../database/schema/game";
+import round from "../../../../database/schema/round";
 import user from "../../../../database/schema/user";
 import { forbiddenResponse } from "../../../auth/game-access";
 import { requireAuth } from "../../../auth/require-auth";
@@ -41,7 +42,8 @@ export const removeParticipant = (config: BaseHandlerConfig) =>
             .select({ createdBy: game.createdBy, participants: game.participants })
             .from(game)
             .where(eq(game.id, gameId))
-            .limit(1);
+            .limit(1)
+            .for("update");
           if (!gameRow) {
             return { error: "GAME_NOT_FOUND" as const };
           }
@@ -50,6 +52,17 @@ export const removeParticipant = (config: BaseHandlerConfig) =>
           }
           if (!gameRow.participants.includes(userId)) {
             return { error: "NOT_PARTICIPANT" as const };
+          }
+
+          const [activeRound] = await tx
+            .select({ id: round.id })
+            .from(round)
+            .where(
+              and(eq(round.game, gameId), eq(round.hostedBy, userId), isNull(round.winningGuess)),
+            )
+            .limit(1);
+          if (activeRound) {
+            return { error: "ACTIVE_HOST" as const };
           }
 
           const participants = gameRow.participants.filter(
@@ -75,6 +88,13 @@ export const removeParticipant = (config: BaseHandlerConfig) =>
             return res
               .status(404)
               .json({ ok: false, code: "NOT_FOUND", message: "Game not found" });
+          }
+          if (result.error === "ACTIVE_HOST") {
+            return res.status(409).json({
+              ok: false,
+              code: "ACTIVE_HOST",
+              message: "Cannot remove a player who hosts an unfinished round",
+            });
           }
           return res.status(404).json({
             ok: false,

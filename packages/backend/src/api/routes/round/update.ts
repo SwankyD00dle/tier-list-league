@@ -69,7 +69,8 @@ export const updateRound = (config: BaseHandlerConfig) =>
               .select({ participants: game.participants })
               .from(game)
               .where(eq(game.id, existing.game))
-              .limit(1);
+              .limit(1)
+              .for("update");
             if (!gameRow?.participants.includes(hostedBy)) {
               return { error: "HOST_NOT_IN_GAME" as const };
             }
