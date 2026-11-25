@@ -99,7 +99,8 @@ export function createMockDb(options?: {
         return createSelectChain(selectResult);
       }),
       innerJoin: () => createSelectChain(selectResult),
-      limit: () => promise,
+      limit: () => createSelectChain(selectResult),
+      for: () => promise,
       orderBy: () => promise,
     });
   };

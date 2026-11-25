@@ -46,7 +46,7 @@ describe("createRound", () => {
     await createRound(createMockConfig(database)).handler(
       await authenticatedRequest({
         params: { gameId },
-        body: { topic: "Best pizza toppings", hostedBy: hostId },
+        body: { topic: "Best pizza toppings", hostedBy: hostId, expectedRoundCount: 0 },
       }),
       res,
     );
@@ -56,6 +56,41 @@ describe("createRound", () => {
       ok: true,
       round: { id: roundId, roundNumber: 1, hostedBy: hostId, topic: "Best pizza toppings" },
     });
+  });
+
+  it("rejects a stale first-round submission without writing", async () => {
+    const database = createMockDb({
+      selectResult: [{ createdBy: gameId, participants: [hostId], rounds: [roundId] }],
+    });
+    const { res, state } = createMockResponse();
+    await createRound(createMockConfig(database)).handler(
+      await authenticatedRequest({
+        params: { gameId },
+        body: { topic: "Stale first round", hostedBy: hostId, expectedRoundCount: 0 },
+      }),
+      res,
+    );
+    expect(state.statusCode).toBe(409);
+    expect(state.body).toMatchObject({ code: "ROUND_COUNT_CHANGED" });
+    expect(database.insert).not.toHaveBeenCalled();
+    expect(database.update).not.toHaveBeenCalled();
+  });
+
+  it("allows an intentional later round with the current count", async () => {
+    const database = createMockDb({
+      selectResult: [{ createdBy: gameId, participants: [hostId], rounds: [roundId] }],
+      insertResult: [{ ...newRound, roundNumber: 2 }],
+      onInsertValues: (values) => expect(values).toMatchObject({ roundNumber: 2 }),
+    });
+    const { res, state } = createMockResponse();
+    await createRound(createMockConfig(database)).handler(
+      await authenticatedRequest({
+        params: { gameId },
+        body: { topic: "Next round", hostedBy: hostId, expectedRoundCount: 1 },
+      }),
+      res,
+    );
+    expect(state.statusCode).toBe(201);
   });
 
   it("rejects a host who is not a participant", async () => {
@@ -101,6 +136,24 @@ describe("updateRound", () => {
 
     expect(state.statusCode).toBe(200);
     expect(state.body).toMatchObject({ ok: true, round: { topic: "New topic" } });
+  });
+
+  it("rejects assigning a host who has been removed", async () => {
+    const database = createMockDb({
+      selectResults: [
+        [{ id: roundId, game: gameId, winningGuess: null }],
+        [{ createdBy: gameId, participants: [hostId] }],
+        [{ participants: [hostId] }],
+      ],
+    });
+    const { res, state } = createMockResponse();
+    await updateRound(createMockConfig(database)).handler(
+      await authenticatedRequest({ params: { id: roundId }, body: { hostedBy: outsiderId } }),
+      res,
+    );
+    expect(state.statusCode).toBe(400);
+    expect(state.body).toMatchObject({ code: "INVALID_PLAYER" });
+    expect(database.update).not.toHaveBeenCalled();
   });
 
   it("rejects updates to a finalized round", async () => {

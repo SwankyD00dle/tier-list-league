@@ -58,6 +58,8 @@ export const createRoundRequestSchema = z.extend(apiRequestSchema, {
     topic: z.string().check(z.minLength(1), z.maxLength(500)),
     hostedBy: z.uuid(),
     endsAt: z.optional(z.iso.datetime()),
+    // Reject stale creation requests; the lobby uses zero to start only the first round.
+    expectedRoundCount: z.optional(z.number().check(z.int(), z.nonnegative())),
   }),
 });
 

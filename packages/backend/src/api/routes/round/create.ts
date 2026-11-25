@@ -36,7 +36,7 @@ export const createRound = (config: BaseHandlerConfig) =>
       }
 
       const { gameId } = req.params;
-      const { topic, hostedBy, endsAt } = req.body;
+      const { topic, hostedBy, endsAt, expectedRoundCount } = req.body;
 
       try {
         const result = await config.db.transaction(async (tx) => {
@@ -48,12 +48,16 @@ export const createRound = (config: BaseHandlerConfig) =>
             })
             .from(game)
             .where(eq(game.id, gameId))
-            .limit(1);
+            .limit(1)
+            .for("update");
           if (!gameRow) {
             return { error: "GAME_NOT_FOUND" as const };
           }
           if (gameRow.createdBy !== auth.sub) {
             return { forbidden: true };
+          }
+          if (expectedRoundCount !== undefined && gameRow.rounds.length !== expectedRoundCount) {
+            return { error: "ROUND_COUNT_CHANGED" as const };
           }
           if (!gameRow.participants.includes(hostedBy)) {
             return { error: "HOST_NOT_IN_GAME" as const };
@@ -90,6 +94,13 @@ export const createRound = (config: BaseHandlerConfig) =>
             return res
               .status(404)
               .json({ ok: false, code: "NOT_FOUND", message: "Game not found" });
+          }
+          if (result.error === "ROUND_COUNT_CHANGED") {
+            return res.status(409).json({
+              ok: false,
+              code: "ROUND_COUNT_CHANGED",
+              message: "The game has already advanced. Reload the lobby to see its rounds.",
+            });
           }
           if (result.error === "HOST_NOT_IN_GAME") {
             return res.status(400).json({

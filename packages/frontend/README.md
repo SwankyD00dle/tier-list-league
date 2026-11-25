@@ -21,10 +21,13 @@ Open http://localhost:3000. Next.js serves the frontend and proxies `/api/*` to 
 - `dev` — start only the Next dev server.
 - `build` / `start` — production build and serve.
 - `typecheck` — type-check with TypeScript 7 (`tsc-native`).
-- `test` — focused public URL, rewrite configuration, API fetch, and OAuth URL tests.
+- `test` — public URL, rewrite configuration, API fetch, OAuth URL, and lobby interaction tests.
 - `test:production` — build and serve real production Next instances at root and `/ingress/app-19`, checking pages, all referenced JS/CSS assets, API and OAuth callback rewrites (including query preservation) against a local mock backend. Requires no database or Discord credentials; replaces `.next` and uses temporary loopback ports. Each build has a three-minute timeout.
 
 ## Notes
+
+- `/game` lists the session user's games. Game titles open `/game/[id]`, and creating a game navigates directly to its lobby.
+- The lobby shows members and rounds. Admins can add registered players, remove other members, and start the first round with a topic and participant host. Round submission screens and invite-link joining are follow-up work.
 
 - Styling uses Tailwind CSS v4 via `@tailwindcss/postcss`; global styles live in `app/globals.css`.
 - Type-checking runs on TypeScript 7. Next's own toolchain still resolves `typescript` 5.9 (Next needs the TS compiler API, which the native TS 7 package does not expose until 7.1), so both are declared intentionally.

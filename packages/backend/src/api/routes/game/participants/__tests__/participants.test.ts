@@ -76,6 +76,23 @@ describe("participants", () => {
     expect(state.body).toEqual({ ok: true, gameId, participants: [existingId] });
   });
 
+  it("rejects removing an active host without changing membership", async () => {
+    const database = createMockDb({
+      selectResults: [
+        [{ createdBy: gameId, participants: [existingId, newUserId] }],
+        [{ id: "active-round" }],
+      ],
+    });
+    const { res, state } = createMockResponse();
+    await removeParticipant(createMockConfig(database)).handler(
+      await authenticatedRequest({ params: { gameId, userId: newUserId } }),
+      res,
+    );
+    expect(state.statusCode).toBe(409);
+    expect(state.body).toMatchObject({ code: "ACTIVE_HOST" });
+    expect(database.update).not.toHaveBeenCalled();
+  });
+
   it("returns 404 when removing a non-participant", async () => {
     const database = createMockDb({
       selectResult: [

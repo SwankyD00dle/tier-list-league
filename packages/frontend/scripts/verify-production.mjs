@@ -77,7 +77,7 @@ try {
         await setTimeout(100);
       }
       assert(ready, `Frontend did not become ready: ${logs}`);
-      for (const page of ["/", "/game"]) {
+      for (const page of ["/", "/game", "/game/00000000-0000-4000-8000-000000000001"]) {
         const response = await fetch(`${origin}${prefix}${page}`);
         assert(response.ok, `Page ${prefix}${page} failed`);
         const html = await response.text();

@@ -42,7 +42,8 @@ export const addParticipant = (config: BaseHandlerConfig) =>
             .select({ createdBy: game.createdBy, participants: game.participants })
             .from(game)
             .where(eq(game.id, gameId))
-            .limit(1);
+            .limit(1)
+            .for("update");
           if (!gameRow) {
             return { error: "GAME_NOT_FOUND" as const };
           }
