@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import roundEvent from "../../../../../database/schema/round-event";
 import {
   authenticatedRequest,
   createMockConfig,
@@ -41,6 +42,7 @@ describe("submitTierList", () => {
     );
 
     expect(state.statusCode).toBe(201);
+    expect(database.insert).toHaveBeenCalledWith(roundEvent);
     expect(state.body).toMatchObject({ ok: true, role: "host", tierList: { id: tierListId } });
   });
 
@@ -73,6 +75,7 @@ describe("submitTierList", () => {
     );
 
     expect(state.statusCode).toBe(201);
+    expect(database.insert).toHaveBeenCalledWith(roundEvent);
     expect(state.body).toMatchObject({ ok: true, role: "participant" });
   });
 
@@ -106,6 +109,7 @@ describe("submitTierList", () => {
     );
 
     expect(state.statusCode).toBe(200);
+    expect(database.insert).toHaveBeenCalledWith(roundEvent);
     expect(state.body).toMatchObject({ ok: true, role: "participant" });
   });
 

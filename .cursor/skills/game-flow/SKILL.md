@@ -42,6 +42,7 @@ Each round proceeds through the following steps:
 
 1. **Host submits tier list.** All other players are in the pending state until their guesses are submitted.
 2. **Users submit guesses.** Hidden until turn end; cut off `X` days from turn 1. Once all participants submit a guess, the host is now pending.
+   If the guess deadline passes with zero submissions, hosting passes to another player.
 3. **Host picks the winner and honorable mentions.**
    - Winner: show the original input, the winning guess, and the host tier list.
    - Honorable mentions: show all guesses.

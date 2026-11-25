@@ -9,6 +9,7 @@ export type {
   RoundScoreDeltas,
   RoundScoreEntry,
 } from "./round";
+export type { RoundEvent, RoundEventKind, RoundEventPayload } from "./round-event";
 export type { ScoreEntry, ScoreEntryKind } from "./score-entry";
 export type { TierList } from "./tier-list";
 export type { User } from "./user";

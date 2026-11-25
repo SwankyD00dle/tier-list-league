@@ -8,6 +8,7 @@ import {
 import { and, eq, inArray } from "drizzle-orm";
 import game from "../../../../database/schema/game";
 import round from "../../../../database/schema/round";
+import roundEvent from "../../../../database/schema/round-event";
 import tierList from "../../../../database/schema/tier-list";
 import { forbiddenResponse } from "../../../auth/game-access";
 import { requireAuth } from "../../../auth/require-auth";
@@ -85,6 +86,22 @@ export const submitTierList = (config: BaseHandlerConfig) =>
               .set({ data, updatedAt: new Date() })
               .where(eq(tierList.id, existingId))
               .returning();
+            if (!updated) {
+              throw new Error("Submission write returned no row");
+            }
+            await tx.insert(roundEvent).values({
+              round: roundId,
+              actor: auth.sub,
+              kind: "tier_list_submitted",
+              payload: {
+                kind: "tier_list_submitted",
+                submissionId: updated.id,
+                operation: "updated",
+                role: isHost ? "host" : "participant",
+                data: updated.data,
+              },
+            });
+
             return { saved: updated, created: false, isHost };
           }
 
@@ -107,6 +124,22 @@ export const submitTierList = (config: BaseHandlerConfig) =>
               updatedAt: new Date(),
             })
             .where(eq(round.id, roundId));
+
+          if (!inserted) {
+            throw new Error("Submission write returned no row");
+          }
+          await tx.insert(roundEvent).values({
+            round: roundId,
+            actor: auth.sub,
+            kind: "tier_list_submitted",
+            payload: {
+              kind: "tier_list_submitted",
+              submissionId: inserted.id,
+              operation: "created",
+              role: isHost ? "host" : "participant",
+              data: inserted.data,
+            },
+          });
 
           return { saved: inserted, created: true, isHost };
         });
