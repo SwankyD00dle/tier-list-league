@@ -9,6 +9,7 @@ import { and, eq } from "drizzle-orm";
 import game from "../../../../database/schema/game";
 import guess from "../../../../database/schema/guess";
 import round from "../../../../database/schema/round";
+import roundEvent from "../../../../database/schema/round-event";
 import { forbiddenResponse } from "../../../auth/game-access";
 import { requireAuth } from "../../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../../handler";
@@ -83,6 +84,21 @@ export const submitGuess = (config: BaseHandlerConfig) =>
               .set({ data, updatedAt: new Date() })
               .where(eq(guess.id, existing.id))
               .returning();
+            if (!updated) {
+              throw new Error("Submission write returned no row");
+            }
+            await tx.insert(roundEvent).values({
+              round: roundId,
+              actor: auth.sub,
+              kind: "guess_submitted",
+              payload: {
+                kind: "guess_submitted",
+                submissionId: updated.id,
+                operation: "updated",
+                data: updated.data,
+              },
+            });
+
             return { saved: updated, created: false };
           }
 
@@ -98,6 +114,21 @@ export const submitGuess = (config: BaseHandlerConfig) =>
             .update(round)
             .set({ guesses: [...roundRow.guesses, inserted.id], updatedAt: new Date() })
             .where(eq(round.id, roundId));
+
+          if (!inserted) {
+            throw new Error("Submission write returned no row");
+          }
+          await tx.insert(roundEvent).values({
+            round: roundId,
+            actor: auth.sub,
+            kind: "guess_submitted",
+            payload: {
+              kind: "guess_submitted",
+              submissionId: inserted.id,
+              operation: "created",
+              data: inserted.data,
+            },
+          });
 
           return { saved: inserted, created: true };
         });
