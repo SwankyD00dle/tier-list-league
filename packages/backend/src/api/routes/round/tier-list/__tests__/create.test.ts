@@ -19,10 +19,13 @@ const data = { SS: [playerId], S: [], A: [], B: [], C: [], D: [], E: [], F: [] }
 
 describe("submitTierList", () => {
   it("stores the host submission as the round's canonical tier list", async () => {
+    const updates: unknown[] = [];
     const database = createMockDb({
+      onUpdateSet: (values) => updates.push(values),
       selectResults: [
         [
           {
+            phase: "awaiting_host",
             game: gameId,
             hostedBy: hostId,
             tierList: null,
@@ -41,6 +44,9 @@ describe("submitTierList", () => {
       res,
     );
 
+    expect(updates).toContainEqual(
+      expect.objectContaining({ phase: "guessing", pendingGuessers: [playerId] }),
+    );
     expect(state.statusCode).toBe(201);
     expect(database.insert).toHaveBeenCalledWith(roundEvent);
     expect(state.body).toMatchObject({ ok: true, role: "host", tierList: { id: tierListId } });
@@ -51,6 +57,7 @@ describe("submitTierList", () => {
       selectResults: [
         [
           {
+            phase: "guessing",
             game: gameId,
             hostedBy: hostId,
             tierList: null,
@@ -84,6 +91,7 @@ describe("submitTierList", () => {
       selectResults: [
         [
           {
+            phase: "guessing",
             game: gameId,
             hostedBy: hostId,
             tierList: null,
@@ -118,6 +126,7 @@ describe("submitTierList", () => {
       selectResults: [
         [
           {
+            phase: "guessing",
             game: gameId,
             hostedBy: hostId,
             tierList: null,
@@ -141,4 +150,21 @@ describe("submitTierList", () => {
     expect(state.statusCode).toBe(409);
     expect(state.body).toMatchObject({ ok: false, code: "ROUND_FINALIZED" });
   });
+});
+
+it.each(["guessing", "judging"])("locks the host tier list during %s", async (phase) => {
+  const database = createMockDb({
+    selectResults: [
+      [{ game: gameId, phase, hostedBy: hostId, winningGuess: null, tierList: tierListId }],
+      [{ participants: [hostId, playerId] }],
+    ],
+  });
+  const { res, state } = createMockResponse();
+  await submitTierList(createMockConfig(database)).handler(
+    await authenticatedRequest({ params: { roundId }, body: { userId: hostId, data } }, hostId),
+    res,
+  );
+  expect(state.statusCode).toBe(409);
+  expect(database.insert).not.toHaveBeenCalled();
+  expect(database.update).not.toHaveBeenCalled();
 });

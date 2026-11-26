@@ -7,6 +7,7 @@ import {
 } from "@tier-list-league/api-schema";
 import { and, eq, inArray } from "drizzle-orm";
 import game from "../../../../database/schema/game";
+import guess from "../../../../database/schema/guess";
 import round from "../../../../database/schema/round";
 import roundEvent from "../../../../database/schema/round-event";
 import tierList from "../../../../database/schema/tier-list";
@@ -47,6 +48,7 @@ export const submitTierList = (config: BaseHandlerConfig) =>
         const result = await config.db.transaction(async (tx) => {
           const [roundRow] = await tx
             .select({
+              phase: round.phase,
               game: round.game,
               hostedBy: round.hostedBy,
               tierList: round.tierList,
@@ -55,7 +57,8 @@ export const submitTierList = (config: BaseHandlerConfig) =>
             })
             .from(round)
             .where(eq(round.id, roundId))
-            .limit(1);
+            .limit(1)
+            .for("update");
           if (!roundRow) {
             return { error: "ROUND_NOT_FOUND" as const };
           }
@@ -76,6 +79,24 @@ export const submitTierList = (config: BaseHandlerConfig) =>
           }
 
           const isHost = roundRow.hostedBy === userId;
+          if (
+            (isHost && roundRow.phase !== "awaiting_host") ||
+            (!isHost && !["guessing", "judging"].includes(roundRow.phase))
+          ) {
+            return { error: "INVALID_PHASE" as const };
+          }
+          const existingGuessers = isHost
+            ? await tx
+                .select({ userId: guess.createdBy })
+                .from(guess)
+                .where(eq(guess.round, roundId))
+            : [];
+          const pendingGuessers = gameRow.participants.filter(
+            (id) => id !== userId && !existingGuessers.some((entry) => entry.userId === id),
+          );
+          if (isHost && gameRow.participants.every((id) => id === userId)) {
+            return { error: "INVALID_PHASE" as const };
+          }
           const existingId = isHost
             ? roundRow.tierList
             : await findParticipantTierListId(tx, roundRow.participantTierLists, userId);
@@ -117,7 +138,12 @@ export const submitTierList = (config: BaseHandlerConfig) =>
             .update(round)
             .set({
               ...(isHost
-                ? { tierList: inserted.id }
+                ? {
+                    tierList: inserted.id,
+                    phase:
+                      pendingGuessers.length === 0 ? ("judging" as const) : ("guessing" as const),
+                    pendingGuessers,
+                  }
                 : {
                     participantTierLists: [...(roundRow.participantTierLists ?? []), inserted.id],
                   }),
@@ -195,9 +221,20 @@ async function findParticipantTierListId(
 
 function tierListErrorResponse(
   res: ApiResponse<SubmitTierListResponse>,
-  error: "ROUND_NOT_FOUND" | "ROUND_FINALIZED" | "PLAYER_NOT_IN_GAME" | "INSERT_FAILED",
+  error:
+    | "INVALID_PHASE"
+    | "ROUND_NOT_FOUND"
+    | "ROUND_FINALIZED"
+    | "PLAYER_NOT_IN_GAME"
+    | "INSERT_FAILED",
 ) {
   switch (error) {
+    case "INVALID_PHASE":
+      return res.status(409).json({
+        ok: false,
+        code: "INVALID_PHASE",
+        message: "This action is unavailable in the current round phase",
+      });
     case "ROUND_NOT_FOUND":
       return res.status(404).json({ ok: false, code: "NOT_FOUND", message: "Round not found" });
     case "ROUND_FINALIZED":

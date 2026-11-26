@@ -6,6 +6,8 @@ export function serializeRound(found: Round) {
     game: found.game,
     roundNumber: found.roundNumber,
     hostedBy: found.hostedBy,
+    phase: found.phase,
+    pendingGuessers: found.pendingGuessers,
     topic: found.topic,
     tierList: found.tierList,
     guesses: found.guesses,

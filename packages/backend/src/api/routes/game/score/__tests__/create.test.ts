@@ -37,13 +37,15 @@ function request(overrides?: { hostedBy?: string; honorableGuess?: string }) {
 }
 
 describe("recordGameScore", () => {
-  it("calculates, replaces, persists, and returns round scores", async () => {
+  it.each(["judging", "finalized"])("calculates and persists scores from %s", async (phase) => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-24T12:00:00.000Z"));
+    const updates: unknown[] = [];
     const database = createMockDb({
+      onUpdateSet: (values) => updates.push(values),
       selectResults: [
         [{ participants: [hostId, winnerId, mentionId] }],
-        [{ id: roundId, game: gameId, hostedBy: hostId }],
+        [{ id: roundId, game: gameId, hostedBy: hostId, phase }],
         [
           { id: winningGuess, userId: winnerId },
           { id: mentionGuess, userId: mentionId },
@@ -71,6 +73,9 @@ describe("recordGameScore", () => {
       res,
     );
 
+    expect(updates).toContainEqual(
+      expect.objectContaining({ phase: "finalized", pendingGuessers: [] }),
+    );
     expect(state.statusCode).toBe(200);
     expect(state.body).toEqual({
       ok: true,
@@ -152,7 +157,7 @@ describe("recordGameScore", () => {
     const database = createMockDb({
       selectResults: [
         [{ participants: [hostId, winnerId, mentionId] }],
-        [{ id: roundId, game: gameId, hostedBy: hostId }],
+        [{ id: roundId, game: gameId, hostedBy: hostId, phase: "judging" }],
       ],
     });
     const { res, state } = createMockResponse();
@@ -183,4 +188,21 @@ describe("recordGameScore", () => {
     expect(state.body).toMatchObject({ ok: false, code: REQUEST_SCHEMA_FAILURE_CODE });
     expect(log.error).not.toHaveBeenCalled();
   });
+});
+
+it.each(["awaiting_host", "guessing"])("rejects scoring during %s", async (phase) => {
+  const database = createMockDb({
+    selectResults: [
+      [{ participants: [hostId, winnerId] }],
+      [{ id: roundId, game: gameId, hostedBy: hostId, phase }],
+    ],
+  });
+  const { res, state } = createMockResponse();
+  await recordGameScore(createMockConfig(database)).handler(
+    await authenticatedRequest(request(), hostId),
+    res,
+  );
+  expect(state.statusCode).toBe(409);
+  expect(state.body).toMatchObject({ code: "INVALID_PHASE" });
+  expect(database.insert).not.toHaveBeenCalled();
 });

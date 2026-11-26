@@ -73,6 +73,14 @@ export const removeParticipant = (config: BaseHandlerConfig) =>
             .set({ participants, updatedAt: new Date() })
             .where(eq(game.id, gameId));
           await tx
+            .update(round)
+            .set({
+              pendingGuessers: sql`array_remove(${round.pendingGuessers}, ${userId}::uuid)`,
+              phase: sql`CASE WHEN cardinality(array_remove(${round.pendingGuessers}, ${userId}::uuid)) = 0 AND cardinality(${round.guesses}) > 0 THEN 'judging' ELSE ${round.phase} END`,
+              updatedAt: new Date(),
+            })
+            .where(and(eq(round.game, gameId), eq(round.phase, "guessing")));
+          await tx
             .update(user)
             .set({ activeGames: sql`array_remove(${user.activeGames}, ${gameId}::uuid)` })
             .where(eq(user.id, userId));

@@ -85,6 +85,7 @@ export function createMockDb(options?: {
   updateResult?: unknown[];
   executeError?: Error;
   onSelectWhere?: (condition: SQL | undefined) => void;
+  onUpdateSet?: (values: unknown) => void;
   onInsertValues?: (values: unknown) => void;
 }): typeof db {
   const selectResults = [...(options?.selectResults ?? [options?.selectResult ?? []])];
@@ -116,13 +117,16 @@ export function createMockDb(options?: {
       }),
     })),
     update: vi.fn(() => ({
-      set: vi.fn(() => ({
-        where: vi.fn(() =>
-          Object.assign(Promise.resolve(), {
-            returning: () => Promise.resolve(updateResult),
-          }),
-        ),
-      })),
+      set: vi.fn((values: unknown) => {
+        options?.onUpdateSet?.(values);
+        return {
+          where: vi.fn(() =>
+            Object.assign(Promise.resolve(), {
+              returning: () => Promise.resolve(updateResult),
+            }),
+          ),
+        };
+      }),
     })),
     delete: vi.fn(() => ({
       where: vi.fn(() => Promise.resolve()),

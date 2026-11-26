@@ -63,6 +63,18 @@ export const createRound = (config: BaseHandlerConfig) =>
             return { error: "HOST_NOT_IN_GAME" as const };
           }
 
+          const previousId = gameRow.rounds.at(-1);
+          if (previousId) {
+            const [previous] = await tx
+              .select({ phase: round.phase })
+              .from(round)
+              .where(eq(round.id, previousId))
+              .limit(1)
+              .for("update");
+            if (previous?.phase !== "finalized") {
+              return { error: "ROUND_IN_PROGRESS" as const };
+            }
+          }
           const [created] = await tx
             .insert(round)
             .values({
@@ -94,6 +106,13 @@ export const createRound = (config: BaseHandlerConfig) =>
             return res
               .status(404)
               .json({ ok: false, code: "NOT_FOUND", message: "Game not found" });
+          }
+          if (result.error === "ROUND_IN_PROGRESS") {
+            return res.status(409).json({
+              ok: false,
+              code: "ROUND_IN_PROGRESS",
+              message: "Finalize the current round before creating another",
+            });
           }
           if (result.error === "ROUND_COUNT_CHANGED") {
             return res.status(409).json({

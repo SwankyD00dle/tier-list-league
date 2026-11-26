@@ -7,6 +7,8 @@ export const roundSchema = z.object({
   game: z.nullable(z.uuid()),
   roundNumber: z.number().check(z.int(), z.positive()),
   hostedBy: z.nullable(z.uuid()),
+  phase: z.enum(["awaiting_host", "guessing", "judging", "finalized"]),
+  pendingGuessers: z.array(z.uuid()),
   topic: z.string(),
   tierList: z.nullable(z.uuid()),
   guesses: z.array(z.uuid()),

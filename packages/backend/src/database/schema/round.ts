@@ -21,6 +21,8 @@ export interface PlayerRoundScore {
 
 export type RoundScoreDeltas = Record<string, PlayerRoundScore>;
 
+export type RoundPhase = "awaiting_host" | "guessing" | "judging" | "finalized";
+
 const round = pgTable(
   "round",
   {
@@ -28,6 +30,8 @@ const round = pgTable(
     game: uuid("game_id").references(() => game.id),
     roundNumber: integer("round_number").notNull().default(1),
     hostedBy: uuid("hosted_by").references(() => user.id),
+    phase: text("phase").$type<RoundPhase>().notNull().default("awaiting_host"),
+    pendingGuessers: uuid("pending_guesser_ids").array().notNull().default([]),
     topic: text("topic").notNull(),
     tierList: uuid("tier_list_id").references(() => tierList.id),
     guesses: uuid("guess_ids").array().notNull().default([]),
@@ -43,7 +47,13 @@ const round = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }),
     endsAt: timestamp("ends_at", { withTimezone: true }),
   },
-  (table) => [check("round_count_positive", sql`${table.roundNumber} > 0`)],
+  (table) => [
+    check("round_count_positive", sql`${table.roundNumber} > 0`),
+    check(
+      "round_phase_valid",
+      sql`${table.phase} IN ('awaiting_host', 'guessing', 'judging', 'finalized')`,
+    ),
+  ],
 );
 
 type Round = typeof round.$inferSelect;
