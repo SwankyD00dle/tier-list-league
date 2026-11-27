@@ -1,0 +1,1686 @@
+{
+  "name": "Tier List League",
+  "$kind": "collection",
+  "description": "Run either group in order against a migrated backend. Set baseUrl including /api (default http://localhost:3000/api). Sign in through Discord as three distinct users and put their access_token cookies in local environment variables adminAccessToken, playerBAccessToken, and playerCAccessToken. Keep tokens local; sign in again if expired. Requests disable the cookie jar and select the player explicitly. Each group creates a separate game and captures IDs automatically. Regular game flow plays one hosted round per player and finishes with three joint winners on three points each. Points-target flow finishes at three points after one round, overriding the hosting quota. Only the first round is created explicitly: scoring returns each automatic next round. Hosts retrieve guesses for judging, retries preserve progression, and finalized guesses are revealed. Three players allow zero honorable mentions under max(0, floor(player count / 5) - 1). Settings lock at game start. timeoutDays sets the guessing deadline after host submission. These flows do not wait for deadline expiry; the local verification script covers that path.",
+  "variables": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api"
+    },
+    {
+      "key": "adminAccessToken",
+      "value": "",
+      "description": "Supply a valid access_token cookie in your local environment."
+    },
+    {
+      "key": "playerBAccessToken",
+      "value": "",
+      "description": "Supply a valid access_token cookie in your local environment."
+    },
+    {
+      "key": "playerCAccessToken",
+      "value": "",
+      "description": "Supply a valid access_token cookie in your local environment."
+    }
+  ],
+  "items": [
+    {
+      "name": "Regular game flow - rounds per player",
+      "$kind": "collection",
+      "items": [
+        {
+          "name": "Identify admin",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/auth/me",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.collectionVariables.set(\"adminId\", result.id);\n"
+            }
+          ]
+        },
+        {
+          "name": "Identify playerB",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/auth/me",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerBAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerBAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerBAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.collectionVariables.set(\"playerBId\", result.id);\n"
+            }
+          ]
+        },
+        {
+          "name": "Identify playerC",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/auth/me",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerCAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerCAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerCAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.collectionVariables.set(\"playerCId\", result.id);\n"
+            }
+          ]
+        },
+        {
+          "name": "Create game",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.collectionVariables.set(\"gameId\", result.game.id);\npm.test(\"Three distinct players\", () => pm.expect(new Set([\"admin\", \"playerB\", \"playerC\"].map(p => pm.collectionVariables.get(p + \"Id\"))).size).to.eql(3));\npm.test(\"Starts in lobby\", () => pm.expect(result.game.status).to.eql(\"lobby\"));"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"name\": \"Postman game {{$timestamp}}\",\n  \"description\": \"Three-player full game\",\n  \"roundCount\": 1,\n  \"pointsTarget\": null,\n  \"timeoutDays\": 1\n}"
+          }
+        },
+        {
+          "name": "Enroll playerB",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/participants",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerBId}}\"\n}"
+          }
+        },
+        {
+          "name": "Enroll playerC",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/participants",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerCId}}\"\n}"
+          }
+        },
+        {
+          "name": "Start first round",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/rounds",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.collectionVariables.set(\"roundId\", result.round.id);\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"topic\": \"Rank pizza toppings\",\n  \"hostedBy\": \"{{adminId}}\",\n  \"expectedRoundCount\": 0\n}"
+          }
+        },
+        {
+          "name": "Round 1 - host chooses topic",
+          "$kind": "http-request",
+          "method": "PATCH",
+          "url": "{{baseUrl}}/rounds/{{roundId}}",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"topic\": \"Rank pizza toppings\"\n}"
+          }
+        },
+        {
+          "name": "Round 1 - host submits tier list",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/tier-lists",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{adminId}}\",\n  \"data\": {\n    \"SS\": [\n      \"Pepperoni\"\n    ],\n    \"S\": [\n      \"Mushrooms\"\n    ],\n    \"A\": [\n      \"Pineapple\"\n    ],\n    \"B\": [],\n    \"C\": [],\n    \"D\": [],\n    \"E\": [],\n    \"F\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 1 - playerB guesses",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerBAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerBAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerBAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerBId}}\",\n  \"data\": \"Pepperoni\"\n}"
+          }
+        },
+        {
+          "name": "Round 1 - playerC guesses",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerCAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerCAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerCAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerCId}}\",\n  \"data\": \"Mushrooms\"\n}"
+          }
+        },
+        {
+          "name": "Round 1 - host retrieves guesses",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.collectionVariables.set(\"winningGuessId\", result.guesses.find(g => g.createdBy === pm.collectionVariables.get(\"playerBId\")).id);\npm.test(\"Both guesses available to host\", () => pm.expect(result.guesses).to.have.length(2));"
+            }
+          ]
+        },
+        {
+          "name": "Round 1 - participant submits tier list",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/tier-lists",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerBAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerBAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerBAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerBId}}\",\n  \"data\": {\n    \"SS\": [\n      \"Pepperoni\"\n    ],\n    \"S\": [\n      \"Mushrooms\"\n    ],\n    \"A\": [\n      \"Pineapple\"\n    ],\n    \"B\": [],\n    \"C\": [],\n    \"D\": [],\n    \"E\": [],\n    \"F\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 1 - award and progress",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/score",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.test(\"Game active\", () => pm.expect(result.game.status).to.eql(\"active\"));\npm.test(\"Winner hosts next round\", () => pm.expect(result.nextRound.hostedBy).to.eql(pm.collectionVariables.get(\"playerBId\")));\npm.collectionVariables.set(\"nextRoundId\", result.nextRound.id);"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"round\": {\n    \"id\": \"{{roundId}}\",\n    \"hostedBy\": \"{{adminId}}\",\n    \"winningGuess\": \"{{winningGuessId}}\",\n    \"honorableMentions\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 1 - retry identical awards",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/score",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.test(\"Same progression on retry\", () => pm.expect(result.nextRound?.id ?? null).to.eql(pm.collectionVariables.get(\"nextRoundId\")));"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"round\": {\n    \"id\": \"{{roundId}}\",\n    \"hostedBy\": \"{{adminId}}\",\n    \"winningGuess\": \"{{winningGuessId}}\",\n    \"honorableMentions\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 1 - reveal guesses",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerBAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerBAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerBAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.test(\"Finalized guesses revealed\", () => pm.expect(result.guesses).to.have.length(2));\npm.collectionVariables.set(\"roundId\", pm.collectionVariables.get(\"nextRoundId\"));"
+            }
+          ]
+        },
+        {
+          "name": "Round 2 - host chooses topic",
+          "$kind": "http-request",
+          "method": "PATCH",
+          "url": "{{baseUrl}}/rounds/{{roundId}}",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerBAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerBAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerBAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"topic\": \"Rank pizza toppings\"\n}"
+          }
+        },
+        {
+          "name": "Round 2 - host submits tier list",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/tier-lists",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerBAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerBAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerBAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerBId}}\",\n  \"data\": {\n    \"SS\": [\n      \"Pepperoni\"\n    ],\n    \"S\": [\n      \"Mushrooms\"\n    ],\n    \"A\": [\n      \"Pineapple\"\n    ],\n    \"B\": [],\n    \"C\": [],\n    \"D\": [],\n    \"E\": [],\n    \"F\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 2 - admin guesses",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{adminId}}\",\n  \"data\": \"Mushrooms\"\n}"
+          }
+        },
+        {
+          "name": "Round 2 - playerC guesses",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerCAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerCAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerCAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerCId}}\",\n  \"data\": \"Pepperoni\"\n}"
+          }
+        },
+        {
+          "name": "Round 2 - host retrieves guesses",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerBAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerBAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerBAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.collectionVariables.set(\"winningGuessId\", result.guesses.find(g => g.createdBy === pm.collectionVariables.get(\"playerCId\")).id);\npm.test(\"Both guesses available to host\", () => pm.expect(result.guesses).to.have.length(2));"
+            }
+          ]
+        },
+        {
+          "name": "Round 2 - participant submits tier list",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/tier-lists",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerCAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerCAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerCAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerCId}}\",\n  \"data\": {\n    \"SS\": [\n      \"Pepperoni\"\n    ],\n    \"S\": [\n      \"Mushrooms\"\n    ],\n    \"A\": [\n      \"Pineapple\"\n    ],\n    \"B\": [],\n    \"C\": [],\n    \"D\": [],\n    \"E\": [],\n    \"F\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 2 - award and progress",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/score",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerBAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerBAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerBAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.test(\"Game active\", () => pm.expect(result.game.status).to.eql(\"active\"));\npm.test(\"Winner hosts next round\", () => pm.expect(result.nextRound.hostedBy).to.eql(pm.collectionVariables.get(\"playerCId\")));\npm.collectionVariables.set(\"nextRoundId\", result.nextRound.id);"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"round\": {\n    \"id\": \"{{roundId}}\",\n    \"hostedBy\": \"{{playerBId}}\",\n    \"winningGuess\": \"{{winningGuessId}}\",\n    \"honorableMentions\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 2 - retry identical awards",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/score",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerBAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerBAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerBAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.test(\"Same progression on retry\", () => pm.expect(result.nextRound?.id ?? null).to.eql(pm.collectionVariables.get(\"nextRoundId\")));"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"round\": {\n    \"id\": \"{{roundId}}\",\n    \"hostedBy\": \"{{playerBId}}\",\n    \"winningGuess\": \"{{winningGuessId}}\",\n    \"honorableMentions\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 2 - reveal guesses",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerCAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerCAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerCAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.test(\"Finalized guesses revealed\", () => pm.expect(result.guesses).to.have.length(2));\npm.collectionVariables.set(\"roundId\", pm.collectionVariables.get(\"nextRoundId\"));"
+            }
+          ]
+        },
+        {
+          "name": "Round 3 - host chooses topic",
+          "$kind": "http-request",
+          "method": "PATCH",
+          "url": "{{baseUrl}}/rounds/{{roundId}}",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerCAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerCAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerCAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"topic\": \"Rank pizza toppings\"\n}"
+          }
+        },
+        {
+          "name": "Round 3 - host submits tier list",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/tier-lists",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerCAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerCAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerCAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerCId}}\",\n  \"data\": {\n    \"SS\": [\n      \"Pepperoni\"\n    ],\n    \"S\": [\n      \"Mushrooms\"\n    ],\n    \"A\": [\n      \"Pineapple\"\n    ],\n    \"B\": [],\n    \"C\": [],\n    \"D\": [],\n    \"E\": [],\n    \"F\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 3 - admin guesses",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{adminId}}\",\n  \"data\": \"Pepperoni\"\n}"
+          }
+        },
+        {
+          "name": "Round 3 - playerB guesses",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerBAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerBAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerBAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerBId}}\",\n  \"data\": \"Mushrooms\"\n}"
+          }
+        },
+        {
+          "name": "Round 3 - host retrieves guesses",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerCAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerCAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerCAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.collectionVariables.set(\"winningGuessId\", result.guesses.find(g => g.createdBy === pm.collectionVariables.get(\"adminId\")).id);\npm.test(\"Both guesses available to host\", () => pm.expect(result.guesses).to.have.length(2));"
+            }
+          ]
+        },
+        {
+          "name": "Round 3 - participant submits tier list",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/tier-lists",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{adminId}}\",\n  \"data\": {\n    \"SS\": [\n      \"Pepperoni\"\n    ],\n    \"S\": [\n      \"Mushrooms\"\n    ],\n    \"A\": [\n      \"Pineapple\"\n    ],\n    \"B\": [],\n    \"C\": [],\n    \"D\": [],\n    \"E\": [],\n    \"F\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 3 - award and progress",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/score",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerCAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerCAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerCAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.test(\"Game finished\", () => pm.expect(result.game.status).to.eql(\"finished\"));\npm.test(\"No next round\", () => pm.expect(result.nextRound).to.eql(null));"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"round\": {\n    \"id\": \"{{roundId}}\",\n    \"hostedBy\": \"{{playerCId}}\",\n    \"winningGuess\": \"{{winningGuessId}}\",\n    \"honorableMentions\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 3 - retry identical awards",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/score",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerCAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerCAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerCAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.test(\"Same progression on retry\", () => pm.expect(result.nextRound?.id ?? null).to.eql(null));"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"round\": {\n    \"id\": \"{{roundId}}\",\n    \"hostedBy\": \"{{playerCId}}\",\n    \"winningGuess\": \"{{winningGuessId}}\",\n    \"honorableMentions\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 3 - reveal guesses",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.test(\"Finalized guesses revealed\", () => pm.expect(result.guesses).to.have.length(2));"
+            }
+          ]
+        },
+        {
+          "name": "Read final scoreboard",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/games/{{gameId}}/score",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\nfor (const player of [\"admin\", \"playerB\", \"playerC\"]) { pm.test(player + \" earned three points\", () => pm.expect(result.scores[pm.collectionVariables.get(player + \"Id\")].total).to.eql(3)); }"
+            }
+          ]
+        },
+        {
+          "name": "Read joint winners",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/games/{{gameId}}",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.test(\"Three rounds played\", () => pm.expect(result.game.rounds).to.have.length(3));\npm.test(\"All players are joint winners\", () => pm.expect([...result.game.winnerIds].sort()).to.eql([\"admin\", \"playerB\", \"playerC\"].map(p => pm.collectionVariables.get(p + \"Id\")).sort()));\npm.test(\"Completion persisted\", () => pm.expect(result.game.finishedAt).to.be.a(\"string\"));"
+            }
+          ]
+        },
+        {
+          "name": "Finished game rejects another round",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/rounds",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 409\", () => pm.response.to.have.status(409));\nconst result = pm.response.json();\nif (pm.response.code !== 409) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(false));\npm.test(\"Finished game\", () => pm.expect(result.code).to.eql(\"GAME_FINISHED\"));"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"topic\": \"Too late\",\n  \"hostedBy\": \"{{adminId}}\"\n}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Points-target game flow",
+      "$kind": "collection",
+      "items": [
+        {
+          "name": "Identify admin",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/auth/me",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.collectionVariables.set(\"adminId\", result.id);\n"
+            }
+          ]
+        },
+        {
+          "name": "Identify playerB",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/auth/me",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerBAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerBAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerBAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.collectionVariables.set(\"playerBId\", result.id);\n"
+            }
+          ]
+        },
+        {
+          "name": "Identify playerC",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/auth/me",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerCAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerCAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerCAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.collectionVariables.set(\"playerCId\", result.id);\n"
+            }
+          ]
+        },
+        {
+          "name": "Create game",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.collectionVariables.set(\"gameId\", result.game.id);\npm.test(\"Three distinct players\", () => pm.expect(new Set([\"admin\", \"playerB\", \"playerC\"].map(p => pm.collectionVariables.get(p + \"Id\"))).size).to.eql(3));\npm.test(\"Starts in lobby\", () => pm.expect(result.game.status).to.eql(\"lobby\"));"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"name\": \"Postman game {{$timestamp}}\",\n  \"description\": \"Three-player full game\",\n  \"roundCount\": 1,\n  \"pointsTarget\": 3,\n  \"timeoutDays\": 1\n}"
+          }
+        },
+        {
+          "name": "Enroll playerB",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/participants",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerBId}}\"\n}"
+          }
+        },
+        {
+          "name": "Enroll playerC",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/participants",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerCId}}\"\n}"
+          }
+        },
+        {
+          "name": "Start first round",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/rounds",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.collectionVariables.set(\"roundId\", result.round.id);\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"topic\": \"Rank pizza toppings\",\n  \"hostedBy\": \"{{adminId}}\",\n  \"expectedRoundCount\": 0\n}"
+          }
+        },
+        {
+          "name": "Round 1 - host chooses topic",
+          "$kind": "http-request",
+          "method": "PATCH",
+          "url": "{{baseUrl}}/rounds/{{roundId}}",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"topic\": \"Rank pizza toppings\"\n}"
+          }
+        },
+        {
+          "name": "Round 1 - host submits tier list",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/tier-lists",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{adminId}}\",\n  \"data\": {\n    \"SS\": [\n      \"Pepperoni\"\n    ],\n    \"S\": [\n      \"Mushrooms\"\n    ],\n    \"A\": [\n      \"Pineapple\"\n    ],\n    \"B\": [],\n    \"C\": [],\n    \"D\": [],\n    \"E\": [],\n    \"F\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 1 - playerB guesses",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerBAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerBAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerBAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerBId}}\",\n  \"data\": \"Pepperoni\"\n}"
+          }
+        },
+        {
+          "name": "Round 1 - playerC guesses",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerCAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerCAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerCAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerCId}}\",\n  \"data\": \"Mushrooms\"\n}"
+          }
+        },
+        {
+          "name": "Round 1 - host retrieves guesses",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.collectionVariables.set(\"winningGuessId\", result.guesses.find(g => g.createdBy === pm.collectionVariables.get(\"playerBId\")).id);\npm.test(\"Both guesses available to host\", () => pm.expect(result.guesses).to.have.length(2));"
+            }
+          ]
+        },
+        {
+          "name": "Round 1 - participant submits tier list",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/tier-lists",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerBAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerBAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerBAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 201\", () => pm.response.to.have.status(201));\nconst result = pm.response.json();\nif (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\n"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"userId\": \"{{playerBId}}\",\n  \"data\": {\n    \"SS\": [\n      \"Pepperoni\"\n    ],\n    \"S\": [\n      \"Mushrooms\"\n    ],\n    \"A\": [\n      \"Pineapple\"\n    ],\n    \"B\": [],\n    \"C\": [],\n    \"D\": [],\n    \"E\": [],\n    \"F\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 1 - award and progress",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/score",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.test(\"Game finished\", () => pm.expect(result.game.status).to.eql(\"finished\"));\npm.test(\"No next round\", () => pm.expect(result.nextRound).to.eql(null));"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"round\": {\n    \"id\": \"{{roundId}}\",\n    \"hostedBy\": \"{{adminId}}\",\n    \"winningGuess\": \"{{winningGuessId}}\",\n    \"honorableMentions\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 1 - retry identical awards",
+          "$kind": "http-request",
+          "method": "POST",
+          "url": "{{baseUrl}}/games/{{gameId}}/score",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.test(\"Same progression on retry\", () => pm.expect(result.nextRound?.id ?? null).to.eql(null));"
+            }
+          ],
+          "body": {
+            "type": "json",
+            "content": "{\n  \"round\": {\n    \"id\": \"{{roundId}}\",\n    \"hostedBy\": \"{{adminId}}\",\n    \"winningGuess\": \"{{winningGuessId}}\",\n    \"honorableMentions\": []\n  }\n}"
+          }
+        },
+        {
+          "name": "Round 1 - reveal guesses",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/rounds/{{roundId}}/guesses",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{playerBAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"playerBAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set playerBAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.test(\"Finalized guesses revealed\", () => pm.expect(result.guesses).to.have.length(2));"
+            }
+          ]
+        },
+        {
+          "name": "Points target overrides rounds per player",
+          "$kind": "http-request",
+          "method": "GET",
+          "url": "{{baseUrl}}/games/{{gameId}}",
+          "headers": [
+            {
+              "key": "Cookie",
+              "value": "access_token={{adminAccessToken}}"
+            }
+          ],
+          "settings": {
+            "disableCookies": true
+          },
+          "scripts": [
+            {
+              "type": "beforeRequest",
+              "code": "if (!pm.variables.get(\"adminAccessToken\")) { pm.execution.setNextRequest(null); throw new Error(\"Set adminAccessToken to a valid Discord session access_token\"); }"
+            },
+            {
+              "type": "afterResponse",
+              "code": "pm.test(\"Expected HTTP 200\", () => pm.response.to.have.status(200));\nconst result = pm.response.json();\nif (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Game flow request failed\"); }\npm.test(\"Response status\", () => pm.expect(result.ok).to.eql(true));\npm.test(\"Finished after one round\", () => pm.expect(result.game.rounds).to.have.length(1));\npm.test(\"Player B wins\", () => pm.expect(result.game.winnerIds).to.eql([pm.collectionVariables.get(\"playerBId\")]));"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

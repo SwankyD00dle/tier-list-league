@@ -5,9 +5,8 @@ import {
   updateRoundResponseSchema,
 } from "@tier-list-league/api-schema";
 import { eq } from "drizzle-orm";
-import game from "../../../database/schema/game";
 import round from "../../../database/schema/round";
-import { forbiddenResponse, hasGameRole } from "../../auth/game-access";
+import { forbiddenResponse } from "../../auth/game-access";
 import { requireAuth } from "../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../handler";
 import {
@@ -16,6 +15,7 @@ import {
   defineRoute,
   requestSchemaFailure,
 } from "../../route-helper";
+import { lockRoundGame } from "./lock";
 import { serializeRound } from "./serialize";
 
 export const updateRound = (config: BaseHandlerConfig) =>
@@ -54,23 +54,14 @@ export const updateRound = (config: BaseHandlerConfig) =>
 
       try {
         const result = await config.db.transaction(async (tx) => {
-          const [existing] = await tx
-            .select({
-              id: round.id,
-              game: round.game,
-              winningGuess: round.winningGuess,
-              phase: round.phase,
-            })
-            .from(round)
-            .where(eq(round.id, roundId))
-            .limit(1)
-            .for("update");
-          if (!existing) {
-            return { error: "ROUND_NOT_FOUND" as const };
-          }
-          if (!(await hasGameRole(tx, existing.game, auth.sub, "admin"))) {
+          const context = await lockRoundGame(tx, roundId);
+          if (context.error !== undefined) return { error: "ROUND_NOT_FOUND" as const };
+          const { roundRow: existing, gameRow } = context;
+          const isAdmin = gameRow.createdBy === auth.sub;
+          const isHost = existing.hostedBy === auth.sub && gameRow.participants.includes(auth.sub);
+          if (!isAdmin && (!isHost || hostedBy !== undefined || endsAt !== undefined))
             return { forbidden: true };
-          }
+          if (gameRow.status === "finished") return { error: "GAME_FINISHED" as const };
           if (existing.winningGuess !== null) {
             return { error: "ROUND_FINALIZED" as const };
           }
@@ -78,18 +69,8 @@ export const updateRound = (config: BaseHandlerConfig) =>
           if (existing.phase !== "awaiting_host") {
             return { error: "ROUND_STARTED" as const };
           }
-          if (hostedBy !== undefined) {
-            if (existing.game === null) {
-              return { error: "HOST_NOT_IN_GAME" as const };
-            }
-            const [gameRow] = await tx
-              .select({ participants: game.participants })
-              .from(game)
-              .where(eq(game.id, existing.game))
-              .limit(1);
-            if (!gameRow?.participants.includes(hostedBy)) {
-              return { error: "HOST_NOT_IN_GAME" as const };
-            }
+          if (hostedBy !== undefined && !gameRow.participants.includes(hostedBy)) {
+            return { error: "HOST_NOT_IN_GAME" as const };
           }
 
           const [updated] = await tx
@@ -99,7 +80,10 @@ export const updateRound = (config: BaseHandlerConfig) =>
               ...(hostedBy === undefined ? {} : { hostedBy }),
               ...(endsAt === undefined
                 ? {}
-                : { endsAt: endsAt === null ? null : new Date(endsAt), guessingDurationMs: null }),
+                : {
+                    endsAt: endsAt === null ? null : new Date(endsAt),
+                    guessingDurationMs: gameRow.timeoutDays * 86_400_000,
+                  }),
               updatedAt: new Date(),
             })
             .where(eq(round.id, roundId))
@@ -111,6 +95,10 @@ export const updateRound = (config: BaseHandlerConfig) =>
           return forbiddenResponse(res);
         }
         if ("error" in result && result.error !== undefined) {
+          if (result.error === "GAME_FINISHED")
+            return res
+              .status(409)
+              .json({ ok: false, code: "GAME_FINISHED", message: "The game has finished" });
           if (result.error === "ROUND_NOT_FOUND") {
             return res
               .status(404)

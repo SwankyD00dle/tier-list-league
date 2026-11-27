@@ -171,3 +171,11 @@ export async function authenticatedRequest(
     },
   };
 }
+
+/** Fixtures for reference lookup, parent lock, then round lock. */
+export function createRoundContextDb(options?: Parameters<typeof createMockDb>[0]) {
+  const [roundRows = [], gameRows = [], ...rest] = options?.selectResults ?? [
+    options?.selectResult ?? [],
+  ];
+  return createMockDb({ ...options, selectResults: [roundRows, gameRows, roundRows, ...rest] });
+}

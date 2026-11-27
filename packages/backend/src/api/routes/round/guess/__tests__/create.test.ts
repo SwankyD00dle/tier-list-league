@@ -3,8 +3,8 @@ import roundEvent from "../../../../../database/schema/round-event";
 import {
   authenticatedRequest,
   createMockConfig,
-  createMockDb,
   createMockResponse,
+  createRoundContextDb,
 } from "../../../../test-helpers";
 import { submitGuess } from "../create";
 
@@ -25,7 +25,7 @@ const savedGuess = {
 
 describe("submitGuess", () => {
   it("creates a new guess and returns 201", async () => {
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [
         [
           {
@@ -58,7 +58,7 @@ describe("submitGuess", () => {
   });
 
   it("replaces an existing guess and returns 200", async () => {
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [
         [
           {
@@ -91,7 +91,7 @@ describe("submitGuess", () => {
   });
 
   it("rejects guesses on a finalized round", async () => {
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [
         [
           {
@@ -121,7 +121,7 @@ describe("submitGuess", () => {
   });
 
   it("rejects non-participants", async () => {
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [
         [
           {
@@ -154,7 +154,7 @@ describe("submitGuess", () => {
 it.each(["awaiting_host", "judging"])(
   "rejects guesses during %s without writing an event",
   async (phase) => {
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [
         [
           {
@@ -184,7 +184,7 @@ it.each([{ remaining: [] }, { remaining: ["550e8400-e29b-41d4-a716-446655440009"
   "updates pending players after a new guess ($remaining)",
   async ({ remaining }) => {
     const updates: unknown[] = [];
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [
         [
           {
@@ -221,7 +221,7 @@ it.each([
   { hostedBy: userId, pendingGuessers: [userId], label: "host" },
   { hostedBy: "host", pendingGuessers: [], label: "player added after guessing opened" },
 ])("rejects a guess from the $label", async ({ hostedBy, pendingGuessers }) => {
-  const database = createMockDb({
+  const database = createRoundContextDb({
     selectResults: [
       [
         {
@@ -248,7 +248,7 @@ it.each([
 
 it("rejects a late guess and commits the deadline transition", async () => {
   const events: unknown[] = [];
-  const database = createMockDb({
+  const database = createRoundContextDb({
     selectResults: [
       [
         {

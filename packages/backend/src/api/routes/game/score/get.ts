@@ -121,7 +121,11 @@ async function findGame(database: typeof db, gameId: string) {
   return found;
 }
 
-function findScoreEntries(database: typeof db, gameId: string, userId?: string) {
+export function findScoreEntries(
+  database: Pick<typeof db, "select">,
+  gameId: string,
+  userId?: string,
+) {
   return database
     .select({
       roundId: scoreEntry.round,

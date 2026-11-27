@@ -8,6 +8,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import game from "../../../../database/schema/game";
 import guess from "../../../../database/schema/guess";
 import round from "../../../../database/schema/round";
+import roundEvent from "../../../../database/schema/round-event";
 import scoreEntry from "../../../../database/schema/score-entry";
 import { forbiddenResponse } from "../../../auth/game-access";
 import { requireAuth } from "../../../auth/require-auth";
@@ -19,6 +20,10 @@ import {
   requestSchemaFailure,
 } from "../../../route-helper";
 import { advanceExpiredRound } from "../../round/deadlines";
+import { serializeRound } from "../../round/serialize";
+import { progressGame } from "../progression";
+import { serializeGame } from "../serialize";
+import { findScoreEntries } from "./get";
 import { aggregateGameScores, aggregateRoundScoreDeltas, buildRoundScoreEntries } from "./service";
 
 export const recordGameScore = (config: BaseHandlerConfig) =>
@@ -58,14 +63,16 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
       try {
         const result = await config.db.transaction(async (tx) => {
           const [gameRow] = await tx
-            .select({ participants: game.participants })
+            .select()
             .from(game)
             .where(eq(game.id, gameId))
-            .limit(1);
+            .limit(1)
+            .for("update");
           if (!gameRow) {
             return { error: "GAME_NOT_FOUND" as const };
           }
 
+          if (!gameRow.participants.includes(auth.sub)) return { error: "HOST_MISMATCH" as const };
           const [storedRound] = await tx
             .select()
             .from(round)
@@ -80,9 +87,43 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
             return { error: "HOST_MISMATCH" as const };
           }
 
-          if (roundRow.phase !== "judging" && roundRow.phase !== "finalized") {
+          if (roundRow.phase === "finalized") {
+            const sortMentions = (mentions: typeof input.honorableMentions) =>
+              [...mentions]
+                .sort((a, b) => a.guessId.localeCompare(b.guessId))
+                .map(({ guessId, title }) => [guessId, title]);
+            if (
+              roundRow.winningGuess !== input.winningGuess ||
+              JSON.stringify(sortMentions(roundRow.honorableMentionDetails)) !==
+                JSON.stringify(sortMentions(input.honorableMentions))
+            ) {
+              return { error: "ROUND_FINALIZED" as const };
+            }
+            const entries = await findScoreEntries(tx, gameId);
+            const [nextRound] = await tx
+              .select()
+              .from(round)
+              .where(and(eq(round.game, gameId), eq(round.roundNumber, roundRow.roundNumber + 1)))
+              .limit(1);
+            return {
+              round: {
+                id: roundRow.id,
+                winningGuess: input.winningGuess,
+                honorableMentions: roundRow.honorableMentionDetails,
+                scoreDeltas: roundRow.scoreDeltas,
+              },
+              scores: aggregateGameScores(gameRow.participants, entries),
+              game: serializeGame(gameRow),
+              nextRound: nextRound ? serializeRound(nextRound) : null,
+            };
+          }
+          if (gameRow.status === "finished") return { error: "GAME_FINISHED" as const };
+          if (roundRow.phase !== "judging") {
             return { error: "INVALID_PHASE" as const };
           }
+          const mentionLimit = Math.max(0, Math.floor(gameRow.participants.length / 5) - 1);
+          if (input.honorableMentions.length > mentionLimit)
+            return { error: "TOO_MANY_MENTIONS" as const };
           const guesses = await tx
             .select({ id: guess.id, userId: guess.createdBy })
             .from(guess)
@@ -110,7 +151,11 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
           }
 
           const awardedUserIds = [winner.userId, ...honorableMentions.map(({ userId }) => userId)];
-          if (awardedUserIds.some((userId) => !gameRow.participants.includes(userId))) {
+          if (
+            awardedUserIds.some(
+              (userId) => userId === roundRow.hostedBy || !gameRow.participants.includes(userId),
+            )
+          ) {
             return { error: "PLAYER_NOT_IN_GAME" as const };
           }
 
@@ -140,16 +185,27 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
             })
             .where(eq(round.id, input.id));
 
-          const allEntries = await tx
-            .select({
-              roundId: scoreEntry.round,
-              userId: scoreEntry.user,
-              score: scoreEntry.score,
-              reason: scoreEntry.reason,
-            })
-            .from(scoreEntry)
-            .where(eq(scoreEntry.game, gameId))
-            .orderBy(scoreEntry.createdAt, scoreEntry.id);
+          const allEntries = await findScoreEntries(tx, gameId);
+          const scores = aggregateGameScores(gameRow.participants, allEntries);
+          const progression = await progressGame(
+            tx,
+            gameRow,
+            { ...roundRow, phase: "finalized", winningGuess: input.winningGuess },
+            winner.userId,
+            scores,
+          );
+          await tx.insert(roundEvent).values({
+            round: roundRow.id,
+            actor: auth.sub,
+            kind: "round_finalized",
+            payload: {
+              kind: "round_finalized",
+              winningGuess: input.winningGuess,
+              nextRoundId: progression.nextRound?.id ?? null,
+              gameFinished: progression.game.status === "finished",
+              winnerIds: progression.game.winnerIds,
+            },
+          });
 
           return {
             round: {
@@ -158,7 +214,9 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
               honorableMentions: input.honorableMentions,
               scoreDeltas,
             },
-            scores: aggregateGameScores(gameRow.participants, allEntries),
+            scores,
+            game: serializeGame(progression.game),
+            nextRound: progression.nextRound ? serializeRound(progression.nextRound) : null,
           };
         });
 
@@ -181,6 +239,9 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
 function scoreErrorResponse(
   res: ApiResponse<RecordGameScoreResponse>,
   error:
+    | "GAME_FINISHED"
+    | "ROUND_FINALIZED"
+    | "TOO_MANY_MENTIONS"
     | "INVALID_PHASE"
     | "GAME_NOT_FOUND"
     | "ROUND_NOT_FOUND"
@@ -189,6 +250,19 @@ function scoreErrorResponse(
     | "PLAYER_NOT_IN_GAME",
 ) {
   switch (error) {
+    case "TOO_MANY_MENTIONS":
+      return res.status(400).json({
+        ok: false,
+        code: error,
+        message: "Honorable mentions exceed max(0, floor(player count / 5) - 1)",
+      });
+    case "GAME_FINISHED":
+    case "ROUND_FINALIZED":
+      return res.status(409).json({
+        ok: false,
+        code: error,
+        message: "Finalized awards are immutable; identical retries are accepted",
+      });
     case "INVALID_PHASE":
       return res.status(409).json({
         ok: false,

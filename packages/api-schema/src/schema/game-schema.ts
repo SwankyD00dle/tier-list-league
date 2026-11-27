@@ -8,6 +8,11 @@ export const gameSchema = z.object({
   description: z.string(),
   participants: z.array(z.uuid()),
   roundCount: z.number().check(z.int(), z.positive()),
+  status: z.enum(["lobby", "active", "finished"]),
+  pointsTarget: z.nullable(z.number().check(z.int(), z.positive())),
+  timeoutDays: z.number().check(z.int(), z.minimum(1), z.maximum(365)),
+  winnerIds: z.array(z.uuid()),
+  finishedAt: z.nullable(z.iso.datetime()),
   rounds: z.array(z.uuid()),
   createdBy: z.nullable(z.uuid()),
   createdAt: z.iso.datetime(),
@@ -38,7 +43,12 @@ export const listGamesResponseSchema = z.extend(apiSuccessResponseSchema, {
 
 export type ListGamesResponse = ZodInfer<typeof listGamesResponseSchema>;
 
-export const createGameBodySchema = z.object({
+const gameSettingsSchema = z.object({
+  pointsTarget: z.optional(z.nullable(z.number().check(z.int(), z.positive()))),
+  timeoutDays: z.optional(z.number().check(z.int(), z.minimum(1), z.maximum(365))),
+});
+
+export const createGameBodySchema = z.extend(gameSettingsSchema, {
   name: z.string().check(z.minLength(1), z.maxLength(200)),
   description: z.string().check(z.maxLength(2000)),
   roundCount: z.number().check(z.int(), z.positive()),
@@ -56,7 +66,7 @@ export const createGameResponseSchema = z.extend(apiSuccessResponseSchema, {
 
 export type CreateGameResponse = ZodInfer<typeof createGameResponseSchema>;
 
-export const updateGameBodySchema = z.object({
+export const updateGameBodySchema = z.extend(gameSettingsSchema, {
   name: z.optional(z.string().check(z.minLength(1), z.maxLength(200))),
   description: z.optional(z.string().check(z.maxLength(2000))),
   roundCount: z.optional(z.number().check(z.int(), z.positive())),

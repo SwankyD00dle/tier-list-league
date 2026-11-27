@@ -49,11 +49,7 @@ export const createRound = (config: BaseHandlerConfig) =>
       try {
         const result = await config.db.transaction(async (tx) => {
           const [gameRow] = await tx
-            .select({
-              createdBy: game.createdBy,
-              participants: game.participants,
-              rounds: game.rounds,
-            })
+            .select()
             .from(game)
             .where(eq(game.id, gameId))
             .limit(1)
@@ -64,6 +60,8 @@ export const createRound = (config: BaseHandlerConfig) =>
           if (gameRow.createdBy !== auth.sub) {
             return { forbidden: true };
           }
+          if (gameRow.status === "finished") return { error: "GAME_FINISHED" as const };
+          if (gameRow.participants.length < 2) return { error: "TOO_FEW_PLAYERS" as const };
           if (expectedRoundCount !== undefined && gameRow.rounds.length !== expectedRoundCount) {
             return { error: "ROUND_COUNT_CHANGED" as const };
           }
@@ -92,6 +90,7 @@ export const createRound = (config: BaseHandlerConfig) =>
               hostedBy,
               topic,
               endsAt: endsAt === undefined ? null : new Date(endsAt),
+              guessingDurationMs: gameRow.timeoutDays * 86_400_000,
             })
             .returning();
           if (!created) {
@@ -100,7 +99,11 @@ export const createRound = (config: BaseHandlerConfig) =>
 
           await tx
             .update(game)
-            .set({ rounds: [...gameRow.rounds, created.id], updatedAt: new Date() })
+            .set({
+              status: "active",
+              rounds: [...gameRow.rounds, created.id],
+              updatedAt: new Date(),
+            })
             .where(eq(game.id, gameId));
 
           return { created };
@@ -110,6 +113,13 @@ export const createRound = (config: BaseHandlerConfig) =>
           return forbiddenResponse(res);
         }
         if ("error" in result && result.error !== undefined) {
+          if (result.error === "GAME_FINISHED" || result.error === "TOO_FEW_PLAYERS") {
+            return res.status(409).json({
+              ok: false,
+              code: result.error,
+              message: "Starting a round requires an unfinished game with at least two players",
+            });
+          }
           if (result.error === "GAME_NOT_FOUND") {
             return res
               .status(404)

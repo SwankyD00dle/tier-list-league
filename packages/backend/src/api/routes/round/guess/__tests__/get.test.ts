@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   authenticatedRequest,
   createMockConfig,
-  createMockDb,
   createMockResponse,
+  createRoundContextDb,
 } from "../../../../test-helpers";
 import { getRoundGuesses } from "../get";
 
@@ -43,7 +43,7 @@ describe("getRoundGuesses", () => {
     { phase: "finalized", caller: host, all: true },
   ])("filters guesses for $caller in $phase", async ({ phase, caller, all }) => {
     const conditions: { sql: string; params: unknown[] }[] = [];
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [[{ ...baseRound, phase }], [{ participants: [host, player] }], [saved]],
       onSelectWhere: (condition) => {
         if (condition) conditions.push(new PgDialect().sqlToQuery(condition));
@@ -63,7 +63,7 @@ describe("getRoundGuesses", () => {
 
   it("advances an expired round before allowing the host to judge", async () => {
     const events: unknown[] = [];
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [
         [{ ...baseRound, endsAt: new Date(0) }],
         [{ participants: [host, player] }],
@@ -83,7 +83,7 @@ describe("getRoundGuesses", () => {
   it.each([{ participants: [] }, { participants: [host] }])(
     "denies a nonparticipant even if they are the game admin",
     async ({ participants }) => {
-      const database = createMockDb({
+      const database = createRoundContextDb({
         selectResults: [[baseRound], [{ createdBy: other, participants }]],
       });
       const { res, state } = createMockResponse();
@@ -92,13 +92,13 @@ describe("getRoundGuesses", () => {
         res,
       );
       expect(state.statusCode).toBe(403);
-      expect(database.select).toHaveBeenCalledTimes(2);
+      expect(database.select).toHaveBeenCalledTimes(3);
     },
   );
 
   it("returns 404 for a missing round", async () => {
     const { res, state } = createMockResponse();
-    await getRoundGuesses(createMockConfig(createMockDb())).handler(
+    await getRoundGuesses(createMockConfig(createRoundContextDb())).handler(
       await authenticatedRequest({ params: { roundId } }, player),
       res,
     );
@@ -106,7 +106,7 @@ describe("getRoundGuesses", () => {
   });
 
   it("returns an empty list when the player has no visible guess", async () => {
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [[baseRound], [{ participants: [host, player] }], []],
     });
     const { res, state } = createMockResponse();

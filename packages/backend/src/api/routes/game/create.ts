@@ -16,6 +16,7 @@ import {
   defineRoute,
   requestSchemaFailure,
 } from "../../route-helper";
+import { serializeGame } from "./serialize";
 
 export const createGame = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -33,7 +34,7 @@ export const createGame = (config: BaseHandlerConfig) =>
         return requestSchemaFailure(res);
       }
 
-      const { name, description, roundCount } = req.body;
+      const { name, description, roundCount, pointsTarget, timeoutDays } = req.body;
       const createdBy = auth.sub;
       const participants = [createdBy];
 
@@ -54,6 +55,8 @@ export const createGame = (config: BaseHandlerConfig) =>
               name,
               description,
               roundCount,
+              pointsTarget,
+              timeoutDays,
               createdBy,
               participants,
             })
@@ -97,17 +100,7 @@ export const createGame = (config: BaseHandlerConfig) =>
         config.log.info({ id: created.id, createdBy }, "Created game");
         return res.status(201).json({
           ok: true,
-          game: {
-            id: created.id,
-            name: created.name,
-            description: created.description,
-            participants: created.participants,
-            roundCount: created.roundCount,
-            rounds: created.rounds,
-            createdBy: created.createdBy,
-            createdAt: created.createdAt.toISOString(),
-            updatedAt: created.updatedAt.toISOString(),
-          },
+          game: serializeGame(created),
         });
       } catch (error) {
         config.log.error({ error: String(error) }, "Create game error");

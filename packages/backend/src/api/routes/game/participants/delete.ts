@@ -39,7 +39,7 @@ export const removeParticipant = (config: BaseHandlerConfig) =>
       try {
         const result = await config.db.transaction(async (tx) => {
           const [gameRow] = await tx
-            .select({ createdBy: game.createdBy, participants: game.participants })
+            .select()
             .from(game)
             .where(eq(game.id, gameId))
             .limit(1)
@@ -50,10 +50,13 @@ export const removeParticipant = (config: BaseHandlerConfig) =>
           if (gameRow.createdBy !== auth.sub) {
             return { forbidden: true };
           }
+          if (gameRow.status === "finished") return { error: "GAME_FINISHED" as const };
           if (!gameRow.participants.includes(userId)) {
             return { error: "NOT_PARTICIPANT" as const };
           }
 
+          if (gameRow.status === "active" && gameRow.participants.length <= 2)
+            return { error: "TOO_FEW_PLAYERS" as const };
           const [activeRound] = await tx
             .select({ id: round.id })
             .from(round)
@@ -107,6 +110,13 @@ export const removeParticipant = (config: BaseHandlerConfig) =>
           return forbiddenResponse(res);
         }
         if ("error" in result && result.error !== undefined) {
+          if (result.error === "GAME_FINISHED" || result.error === "TOO_FEW_PLAYERS")
+            return res.status(409).json({
+              ok: false,
+              code: result.error,
+              message:
+                "An active game requires at least two players and finished membership is locked",
+            });
           if (result.error === "GAME_NOT_FOUND") {
             return res
               .status(404)
