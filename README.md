@@ -53,3 +53,9 @@ The [full-app Compose setup](packages/backend/README.md#run-the-full-app-with-do
 
 To deploy automatically from `main` using GitHub Actions secrets and a standard free
 runner for this public repository, follow the [sandbox deployment setup](scripts/DEPLOYMENT.md).
+
+## Continuous integration
+
+The `CI` workflow runs `npm run lint`, `npm run typecheck`, and `npm test` on every
+push and pull request. The `Lint, typecheck, test` check is required for `main` by
+the repository's GitHub ruleset. It uses a standard Ubuntu runner with caching disabled.
