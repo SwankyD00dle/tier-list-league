@@ -43,12 +43,9 @@ jobs:
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
-      - name: Build sandbox and switch endpoint
+      - name: Update and restart application
         run: node scripts/deploy-sandbox.mjs
         env:
           PLATFORM_API_URL: ${{ vars.PLATFORM_API_URL || 'https://platform.adaptstaging.com' }}
-          PLATFORM_ENDPOINT_ID: ${{ vars.PLATFORM_ENDPOINT_ID }}
+          PLATFORM_SANDBOX_ID: ${{ secrets.PLATFORM_SANDBOX_ID }}
           PLATFORM_API_KEY: ${{ secrets.PLATFORM_API_KEY }}
-          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
-          DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}

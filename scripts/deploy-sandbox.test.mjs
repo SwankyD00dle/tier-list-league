@@ -4,146 +4,61 @@ import { configuration, deploy, platformClient } from "./deploy-sandbox.mjs";
 
 const config = {
   PLATFORM_API_URL: "https://platform.example.com",
-  PLATFORM_ENDPOINT_ID: "b3c6c82e-2f51-4734-88a6-b1ebd7f3e4c4",
+  PLATFORM_SANDBOX_ID: "987928ec-eada-4c28-8cfe-72686f1d5268",
   PLATFORM_API_KEY: "platform-secret",
-  DISCORD_CLIENT_ID: "discord-client",
-  DISCORD_CLIENT_SECRET: "discord-secret",
-  JWT_SECRET: "jwt-secret",
-  GITHUB_REPOSITORY: "SwankyD00dle/tier-list-league",
-  GITHUB_SHA: "a".repeat(40),
 };
 const pause = async () => {};
 
-function fixture({
-  buildFails = false,
-  publicFails = false,
-  ambiguousBind = false,
-  owned = true,
-  externallyChanged = false,
-  rollbackFails = false,
-  initiallyUnbound = false,
-} = {}) {
-  let binding = initiallyUnbound ? null : { sandboxId: "old", port: 3000 };
-  let reads = 0;
-  let switched = false;
+test("executes deployment only in the configured sandbox and waits for completion", async () => {
   const calls = [];
-  const logs = [];
-  const api = async (method, path, body) => {
-    calls.push({ method, path, body });
-    if (path === "/sandboxes" && method === "POST") return { id: "new" };
-    if (path === "/sandboxes/new" && method === "GET") return { status: "running" };
-    if (path === "/sandboxes/new/exec") return { id: "build" };
-    if (path === "/execs/build") return { status: "exited", exitCode: buildFails ? 1 : 0 };
-    if (path.endsWith("/binding")) {
-      if (switched && rollbackFails) throw new Error("Rollback unavailable");
-      binding = method === "DELETE" ? null : body;
-      if (body?.sandboxId === "new") {
-        switched = true;
-        if (ambiguousBind) throw new Error("Response lost after binding");
-      }
-      return {};
-    }
-    if (path.startsWith("/ingresses/") && method === "GET") {
-      reads++;
-      if (externallyChanged && reads === 2) binding = { sandboxId: "external", port: 3000 };
-      return { url: "https://app.example.com/", accessMode: "public", binding };
-    }
-    if (path === "/sandboxes/old" && method === "GET") {
-      return {
-        configuration: {
-          labels: owned
-            ? {
-                owner: "tier-list-league-actions",
-                repository: config.GITHUB_REPOSITORY,
-              }
-            : {},
-        },
-      };
-    }
-    if (method === "DELETE" && path.startsWith("/sandboxes/")) return;
-    throw new Error(`Unexpected ${method} ${path}`);
-  };
-  return {
-    calls,
-    logs,
-    binding: () => binding,
-    run: () =>
+  let polls = 0;
+  await deploy(config, {
+    pause,
+    log: () => {},
+    api: async (method, path, body) => {
+      calls.push({ method, path, body });
+      if (method === "POST") return { id: "deployment" };
+      return ++polls === 1 ? { status: "running" } : { status: "exited", exitCode: 0 };
+    },
+  });
+  assert.equal(calls[0].path, `/sandboxes/${config.PLATFORM_SANDBOX_ID}/exec`);
+  assert.equal(calls[0].body.cwd, "/app");
+  assert.ok(!JSON.stringify(calls[0].body).includes(config.PLATFORM_API_KEY));
+  assert.deepEqual(
+    calls.slice(1).map(({ method, path }) => [method, path]),
+    [
+      ["GET", "/execs/deployment"],
+      ["GET", "/execs/deployment"],
+    ],
+  );
+});
+
+for (const result of [
+  { status: "exited", exitCode: 1 },
+  { status: "timed_out", exitCode: null },
+]) {
+  test(`reports failed exec (${result.status}) without printing remote output`, async () => {
+    await assert.rejects(
       deploy(config, {
-        api,
         pause,
-        log: (message) => logs.push(message),
-        fetcher: async () => ({ ok: !publicFails, json: async () => ({ sha: config.GITHUB_SHA }) }),
+        log: () => {},
+        api: async (method) =>
+          method === "POST" ? { id: "deployment" } : { ...result, stderr: "secret output" },
       }),
-  };
-}
-
-const deleted = (f, id) =>
-  f.calls.some((c) => c.method === "DELETE" && c.path === `/sandboxes/${id}`);
-
-test("switches a healthy build and removes only the previous owned sandbox", async () => {
-  const f = fixture();
-  await f.run();
-  assert.equal(f.binding().sandboxId, "new");
-  assert.ok(deleted(f, "old"));
-  assert.ok(!deleted(f, "new"));
-  const exec = f.calls.find((c) => c.path.endsWith("/exec"));
-  assert.equal(exec.body.env.JWT_SECRET, config.JWT_SECRET);
-  assert.ok(!JSON.stringify(exec.body.argv).includes(config.JWT_SECRET));
-  assert.ok(!f.logs.join().includes(config.JWT_SECRET));
-  const switchIndex = f.calls.findIndex((c) => c.method === "PUT");
-  assert.ok(switchIndex > f.calls.findIndex((c) => c.path === "/execs/build"));
-});
-
-test("retains the manually provisioned sandbox", async () => {
-  const f = fixture({ owned: false });
-  await f.run();
-  assert.ok(!deleted(f, "old"));
-});
-
-test("a failed build never switches the endpoint", async () => {
-  const f = fixture({ buildFails: true });
-  await assert.rejects(f.run(), /Deploy exec/);
-  assert.equal(f.binding().sandboxId, "old");
-  assert.ok(!f.calls.some((c) => c.method === "PUT"));
-  assert.ok(deleted(f, "new"));
-});
-
-for (const failure of ["publicFails", "ambiguousBind"]) {
-  test(`${failure} restores the prior binding before deleting the candidate`, async () => {
-    const f = fixture({ [failure]: true });
-    await assert.rejects(f.run());
-    assert.equal(f.binding().sandboxId, "old");
-    assert.ok(deleted(f, "new"));
-    assert.ok(!deleted(f, "old"));
+      (error) =>
+        error.message.includes("Deployment exec deployment") &&
+        !error.message.includes("secret output"),
+    );
   });
 }
 
-test("rollback restores an initially unbound endpoint", async () => {
-  const f = fixture({ publicFails: true, initiallyUnbound: true });
-  await assert.rejects(f.run());
-  assert.equal(f.binding(), null);
-  assert.ok(deleted(f, "new"));
-});
-
-test("failed rollback retains the candidate that may still be serving traffic", async () => {
-  const f = fixture({ publicFails: true, rollbackFails: true });
-  await assert.rejects(f.run());
-  assert.equal(f.binding().sandboxId, "new");
-  assert.ok(!deleted(f, "new"));
-  assert.ok(f.logs.some((message) => message.includes("Cleanup could not be confirmed")));
-});
-
-test("does not overwrite an endpoint changed by another deployment", async () => {
-  const f = fixture({ externallyChanged: true });
-  await assert.rejects(f.run(), /Endpoint changed/);
-  assert.equal(f.binding().sandboxId, "external");
-  assert.ok(deleted(f, "new"));
-});
-
-test("validates required secrets and commit before provisioning", () => {
-  assert.equal(configuration(config).GITHUB_SHA, config.GITHUB_SHA);
-  assert.throws(() => configuration({ ...config, JWT_SECRET: "" }), /Missing JWT_SECRET/);
-  assert.throws(() => configuration({ ...config, GITHUB_SHA: "main" }), /commit SHA/);
+test("validates credentials and sandbox ID before execution", () => {
+  assert.equal(configuration(config).PLATFORM_SANDBOX_ID, config.PLATFORM_SANDBOX_ID);
+  assert.throws(
+    () => configuration({ ...config, PLATFORM_API_KEY: "" }),
+    /Missing PLATFORM_API_KEY/,
+  );
+  assert.throws(() => configuration({ ...config, PLATFORM_SANDBOX_ID: "wrong" }), /UUID/);
   assert.throws(
     () => configuration({ ...config, PLATFORM_API_URL: "http://example.com" }),
     /HTTPS/,
@@ -161,7 +76,10 @@ test("reuses the idempotency key after a lost mutation response", async () => {
     },
     pause,
   );
-  assert.deepEqual(await api("POST", "/sandboxes", { image: "ubuntu:24.04" }), { id: "new" });
+  assert.deepEqual(
+    await api("POST", `/sandboxes/${config.PLATFORM_SANDBOX_ID}/exec`, { argv: ["true"] }),
+    { id: "new" },
+  );
   assert.equal(requests[0].headers["Idempotency-Key"], requests[1].headers["Idempotency-Key"]);
   assert.equal(requests[0].body, requests[1].body);
 });
@@ -176,6 +94,57 @@ test("does not leak platform response bodies or retry rejected credentials", asy
     },
     pause,
   );
-  await assert.rejects(api("GET", "/sandboxes"), { message: "Platform GET /sandboxes: HTTP 401" });
+  await assert.rejects(api("GET", "/execs/deployment"), {
+    message: "Platform GET /execs/deployment: HTTP 401",
+  });
   assert.equal(count, 1);
+});
+
+test("Compose deployment updates in order and stops on migration failure", async () => {
+  const { mkdtemp, mkdir, readFile, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { spawnSync } = await import("node:child_process");
+  const directory = await mkdtemp(join(tmpdir(), "tier-deploy-test-"));
+  try {
+    const bin = join(directory, "bin");
+    await mkdir(bin);
+    const fake = `#!/bin/bash
+name=$(basename "$0")
+echo "$name $*" >>"$COMMAND_LOG"
+if [[ "$name $*" == 'git branch --show-current' ]]; then echo main; fi
+if [[ "$name" == docker && "$*" == *' run --rm --no-deps migrate' && "$FAIL_MIGRATION" == 1 ]]; then exit 1; fi
+`;
+    for (const command of ["git", "docker", "curl", "flock"]) {
+      await writeFile(join(bin, command), fake, { mode: 0o755 });
+    }
+    const script = (await readFile(new URL("sandbox-deploy.sh", import.meta.url), "utf8"))
+      .replace("cd /app", 'cd "$TEST_APP"')
+      .replace("/tmp/tier-list-league-deploy.lock", `${directory}/deploy.lock`);
+    for (const fail of [false, true]) {
+      const log = join(directory, `commands-${fail}`);
+      const result = spawnSync("bash", ["-c", script], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          TEST_APP: directory,
+          COMMAND_LOG: log,
+          FAIL_MIGRATION: fail ? "1" : "0",
+        },
+      });
+      assert.equal(result.status, fail ? 1 : 0, result.stderr);
+      const commands = (await readFile(log, "utf8")).split("\n");
+      const operations = commands.filter((line) => / stop | pull | build$| run | up /.test(line));
+      assert.equal(operations.length, fail ? 4 : 5);
+      assert.match(operations[0], /stop frontend backend$/);
+      assert.equal(operations[1], "git pull --ff-only origin main");
+      assert.match(operations[2], / build$/);
+      assert.match(operations[3], /run --rm --no-deps migrate$/);
+      if (!fail) assert.match(operations[4], /up -d --no-deps --wait backend frontend$/);
+      assert.ok(!commands.some((line) => / down|stop.* db/.test(line)));
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
