@@ -72,7 +72,10 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
             return { error: "GAME_NOT_FOUND" as const };
           }
 
-          if (!gameRow.participants.includes(auth.sub)) return { error: "HOST_MISMATCH" as const };
+          if (!gameRow.participants.includes(auth.sub)) {
+            return { error: "NOT_PARTICIPANT" as const };
+          }
+
           const [storedRound] = await tx
             .select()
             .from(round)
@@ -242,6 +245,7 @@ function scoreErrorResponse(
     | "GAME_FINISHED"
     | "ROUND_FINALIZED"
     | "TOO_MANY_MENTIONS"
+    | "NOT_PARTICIPANT"
     | "INVALID_PHASE"
     | "GAME_NOT_FOUND"
     | "ROUND_NOT_FOUND"
@@ -263,6 +267,8 @@ function scoreErrorResponse(
         code: error,
         message: "Finalized awards are immutable; identical retries are accepted",
       });
+    case "NOT_PARTICIPANT":
+      return forbiddenResponse(res);
     case "INVALID_PHASE":
       return res.status(409).json({
         ok: false,

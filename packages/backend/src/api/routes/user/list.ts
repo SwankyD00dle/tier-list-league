@@ -6,6 +6,7 @@ import {
 } from "@tier-list-league/api-schema";
 import type { db } from "../../../database/client";
 import user from "../../../database/schema/user";
+import { requireAuth } from "../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../handler";
 import {
   type ApiRequest,
@@ -22,6 +23,8 @@ export const listUsers = (config: BaseHandlerConfig) =>
     request: listUsersRequestSchema,
     response: listUsersResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<ListUsersResponse>) => {
+      if (!(await requireAuth(req, res))) return;
+      res.setHeader("Cache-Control", "private, no-store");
       if (!isListUsersRequest(req)) {
         return requestSchemaFailure(res);
       }

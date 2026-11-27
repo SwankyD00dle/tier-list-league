@@ -7,6 +7,7 @@ import {
 import { eq } from "drizzle-orm";
 import type { db } from "../../../database/client";
 import user from "../../../database/schema/user";
+import { requireAuth } from "../../auth/require-auth";
 import type { BaseHandlerConfig } from "../../handler";
 import {
   type ApiRequest,
@@ -23,6 +24,8 @@ export const getUser = (config: BaseHandlerConfig) =>
     request: getUserRequestSchema,
     response: getUserResponseSchema,
     handler: async (req: ApiRequest, res: ApiResponse<GetUserResponse>) => {
+      if (!(await requireAuth(req, res))) return;
+      res.setHeader("Cache-Control", "private, no-store");
       if (!isGetUserRequest(req)) {
         return requestSchemaFailure(res);
       }

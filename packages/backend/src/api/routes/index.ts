@@ -21,7 +21,6 @@ import { getRoundGuesses } from "./round/guess/get";
 import { submitTierList } from "./round/tier-list/create";
 import { updateRound } from "./round/update";
 import { getTierList } from "./tier-list/get";
-import { createUser } from "./user/create";
 import { getUser } from "./user/get";
 import { listUsers } from "./user/list";
 
@@ -34,7 +33,6 @@ export function buildRoutes(config: BaseHandlerConfig): RegisteredRoute[] {
     { method: "POST", path: "/api/auth/logout", definition: logout(config) },
     { method: "GET", path: "/api/auth/me", definition: getMe(config) },
     { method: "GET", path: "/api/users", definition: listUsers(config) },
-    { method: "POST", path: "/api/users", definition: createUser(config) },
     { method: "GET", path: "/api/users/:id", definition: getUser(config) },
     { method: "GET", path: "/api/games", definition: listGames(config) },
     { method: "POST", path: "/api/games", definition: createGame(config) },

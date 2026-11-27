@@ -33,24 +33,3 @@ export const listUsersResponseSchema = z.extend(apiSuccessResponseSchema, {
 });
 
 export type ListUsersResponse = ZodInfer<typeof listUsersResponseSchema>;
-
-export const createUserBodySchema = z.object({
-  name: z.string().check(z.minLength(1), z.maxLength(100)),
-  discordUserId: z.string().check(z.minLength(1), z.maxLength(100)),
-  games: z.array(z.string()),
-});
-
-export const createUserRequestSchema = z.extend(apiRequestSchema, {
-  body: createUserBodySchema,
-});
-
-export type CreateUserRequest = ZodInfer<typeof createUserRequestSchema>;
-
-export const createUserResponseSchema = z.extend(apiSuccessResponseSchema, {
-  id: z.uuid(),
-  name: z.string(),
-  discordUserId: z.string(),
-  createdAt: z.iso.datetime(),
-});
-
-export type CreateUserResponse = ZodInfer<typeof createUserResponseSchema>;

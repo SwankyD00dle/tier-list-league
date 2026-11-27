@@ -14,7 +14,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed:default-avatars": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local --env-file-if-exists=.env --import tsx src/scripts/seed-default-avatars.ts",
-    "verify:game-flow": "node --import tsx scripts/verify-game-flow.mts"
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "exports": {
     "./schema": "./src/database/schema/types.ts"

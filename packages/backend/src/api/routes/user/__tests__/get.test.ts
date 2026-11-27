@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { REQUEST_SCHEMA_FAILURE_CODE } from "../../../route-helper";
 import {
+  authenticatedRequest,
   createMockConfig,
   createMockDb,
   createMockResponse,
@@ -27,7 +28,7 @@ describe("getUser", () => {
     const { res, state } = createMockResponse();
     const route = getUser(createMockConfig(database));
 
-    await route.handler({ params: { id: userId } }, res);
+    await route.handler(await authenticatedRequest({ params: { id: userId } }), res);
 
     expect(state.statusCode).toBe(200);
     expect(state.body).toEqual({
@@ -46,7 +47,7 @@ describe("getUser", () => {
     const { res, state } = createMockResponse();
     const route = getUser(createMockConfig(createMockDb({ selectResult: [] })));
 
-    await route.handler({ params: { id: userId } }, res);
+    await route.handler(await authenticatedRequest({ params: { id: userId } }), res);
 
     expect(state.statusCode).toBe(404);
     expect(state.body).toEqual({
@@ -60,7 +61,7 @@ describe("getUser", () => {
     const { res, state } = createMockResponse();
     const route = getUser(createMockConfig());
 
-    await route.handler({ params: { id: "not-a-uuid" } }, res);
+    await route.handler(await authenticatedRequest({ params: { id: "not-a-uuid" } }), res);
 
     expect(state.statusCode).toBe(400);
     expect(state.body).toMatchObject({
@@ -73,7 +74,7 @@ describe("getUser", () => {
     const { res, state } = createMockResponse();
     const route = getUser(createMockConfig());
 
-    await route.handler(emptyRequest(), res);
+    await route.handler(await authenticatedRequest(emptyRequest()), res);
 
     expect(state.statusCode).toBe(400);
     expect(state.body).toMatchObject({
