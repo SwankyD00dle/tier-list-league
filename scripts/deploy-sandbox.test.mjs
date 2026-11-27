@@ -1,104 +1,5 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { configuration, deploy, platformClient } from "./deploy-sandbox.mjs";
-
-const config = {
-  PLATFORM_API_URL: "https://platform.example.com",
-  PLATFORM_SANDBOX_ID: "987928ec-eada-4c28-8cfe-72686f1d5268",
-  PLATFORM_API_KEY: "platform-secret",
-};
-const pause = async () => {};
-
-test("executes deployment only in the configured sandbox and waits for completion", async () => {
-  const calls = [];
-  let polls = 0;
-  await deploy(config, {
-    pause,
-    log: () => {},
-    api: async (method, path, body) => {
-      calls.push({ method, path, body });
-      if (method === "POST") return { id: "deployment" };
-      return ++polls === 1 ? { status: "running" } : { status: "exited", exitCode: 0 };
-    },
-  });
-  assert.equal(calls[0].path, `/sandboxes/${config.PLATFORM_SANDBOX_ID}/exec`);
-  assert.equal(calls[0].body.cwd, "/app");
-  assert.ok(!JSON.stringify(calls[0].body).includes(config.PLATFORM_API_KEY));
-  assert.deepEqual(
-    calls.slice(1).map(({ method, path }) => [method, path]),
-    [
-      ["GET", "/execs/deployment"],
-      ["GET", "/execs/deployment"],
-    ],
-  );
-});
-
-for (const result of [
-  { status: "exited", exitCode: 1 },
-  { status: "timed_out", exitCode: null },
-]) {
-  test(`reports failed exec (${result.status}) without printing remote output`, async () => {
-    await assert.rejects(
-      deploy(config, {
-        pause,
-        log: () => {},
-        api: async (method) =>
-          method === "POST" ? { id: "deployment" } : { ...result, stderr: "secret output" },
-      }),
-      (error) =>
-        error.message.includes("Deployment exec deployment") &&
-        !error.message.includes("secret output"),
-    );
-  });
-}
-
-test("validates credentials and sandbox ID before execution", () => {
-  assert.equal(configuration(config).PLATFORM_SANDBOX_ID, config.PLATFORM_SANDBOX_ID);
-  assert.throws(
-    () => configuration({ ...config, PLATFORM_API_KEY: "" }),
-    /Missing PLATFORM_API_KEY/,
-  );
-  assert.throws(() => configuration({ ...config, PLATFORM_SANDBOX_ID: "wrong" }), /UUID/);
-  assert.throws(
-    () => configuration({ ...config, PLATFORM_API_URL: "http://example.com" }),
-    /HTTPS/,
-  );
-});
-
-test("reuses the idempotency key after a lost mutation response", async () => {
-  const requests = [];
-  const api = platformClient(
-    config,
-    async (_url, request) => {
-      requests.push(request);
-      if (requests.length === 1) throw new Error("Lost response");
-      return new Response('{"id":"new"}', { status: 202 });
-    },
-    pause,
-  );
-  assert.deepEqual(
-    await api("POST", `/sandboxes/${config.PLATFORM_SANDBOX_ID}/exec`, { argv: ["true"] }),
-    { id: "new" },
-  );
-  assert.equal(requests[0].headers["Idempotency-Key"], requests[1].headers["Idempotency-Key"]);
-  assert.equal(requests[0].body, requests[1].body);
-});
-
-test("does not leak platform response bodies or retry rejected credentials", async () => {
-  let count = 0;
-  const api = platformClient(
-    config,
-    async () => {
-      count++;
-      return new Response("sensitive response", { status: 401 });
-    },
-    pause,
-  );
-  await assert.rejects(api("GET", "/execs/deployment"), {
-    message: "Platform GET /execs/deployment: HTTP 401",
-  });
-  assert.equal(count, 1);
-});
 
 test("Compose deployment updates in order and stops on migration failure", async () => {
   const { mkdtemp, mkdir, readFile, writeFile, rm } = await import("node:fs/promises");
@@ -143,6 +44,88 @@ if [[ "$name" == docker && "$*" == *' run --rm --no-deps migrate' && "$FAIL_MIGR
       assert.match(operations[3], /run --rm --no-deps migrate$/);
       if (!fail) assert.match(operations[4], /up -d --no-deps --wait backend frontend$/);
       assert.ok(!commands.some((line) => / down|stop.* db/.test(line)));
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("workflow submits the script and handles exec success, failure and API errors", async () => {
+  const { mkdtemp, readFile, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { spawnSync } = await import("node:child_process");
+  const directory = await mkdtemp(join(tmpdir(), "tier-workflow-test-"));
+  try {
+    const workflow = await readFile(
+      new URL("../.github/workflows/deploy.yml", import.meta.url),
+      "utf8",
+    );
+    const block = workflow.split("        run: |\n")[1].split("        env:\n")[0];
+    const script = block
+      .split("\n")
+      .map((line) => line.slice(10))
+      .join("\n");
+    await writeFile(
+      join(directory, "curl"),
+      `#!/bin/bash
+set -eu
+output=''
+payload=''
+while (( $# )); do
+  case "$1" in
+    --output) output=$2; shift ;;
+    --data) payload=$2; shift ;;
+  esac
+  shift
+done
+if [[ "$RESULT" == api-error ]]; then exit 22; fi
+if [[ -n "$payload" ]]; then
+  printf '%s' "$payload" >"$PAYLOAD_FILE"
+  echo '{"id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}' >"$output"
+elif [[ ! -f "$POLL_MARKER" ]]; then
+  touch "$POLL_MARKER"
+  echo '{"status":"running"}' >"$output"
+else
+  printf '%s' "$RESULT" >"$output"
+fi
+`,
+      { mode: 0o755 },
+    );
+    await writeFile(join(directory, "sleep"), "#!/bin/bash\nexit 0\n", { mode: 0o755 });
+    const cases = [
+      ['{"status":"exited","exitCode":0}', true],
+      ['{"status":"exited","exitCode":1,"stderr":"sensitive output"}', false],
+      ['{"status":"timed_out","exitCode":null}', false],
+      ["api-error", false],
+    ];
+    for (const [index, [response, success]] of cases.entries()) {
+      const payloadFile = join(directory, `payload-${index}`);
+      const result = spawnSync("bash", ["-c", script], {
+        encoding: "utf8",
+        timeout: 5000,
+        env: {
+          ...process.env,
+          PATH: `${directory}:${process.env.PATH}`,
+          PLATFORM_API_URL: "https://platform.example.com",
+          PLATFORM_API_KEY: "test-key",
+          PLATFORM_SANDBOX_ID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          RESULT: response,
+          PAYLOAD_FILE: payloadFile,
+          POLL_MARKER: join(directory, `poll-${index}`),
+        },
+      });
+      assert.equal(result.status === 0, success, result.stderr);
+      assert.ok(!`${result.stdout}${result.stderr}`.includes("sensitive output"));
+      if (response !== "api-error") {
+        const payload = JSON.parse(await readFile(payloadFile, "utf8"));
+        assert.equal(payload.cwd, "/app");
+        assert.deepEqual(payload.argv.slice(0, 2), ["bash", "-lc"]);
+        assert.equal(
+          payload.argv[2],
+          await readFile(new URL("sandbox-deploy.sh", import.meta.url), "utf8"),
+        );
+      }
     }
   } finally {
     await rm(directory, { recursive: true, force: true });

@@ -1,7 +1,8 @@
 # GitHub Actions deployment
 
 On a push to `main` (including a merged PR), [Deploy sandbox](../.github/workflows/deploy.yml)
-validates the code and executes `sandbox-deploy.sh` in your existing sandbox:
+validates the code, then uses inline Bash with `curl` and `jq` to submit
+`sandbox-deploy.sh` to your existing sandbox and poll the execution status:
 
 1. Stop the frontend and backend with Docker Compose, leaving PostgreSQL running.
 2. Run `git pull --ff-only origin main` in `/app`.
