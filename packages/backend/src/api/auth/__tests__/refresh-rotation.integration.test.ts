@@ -1,23 +1,26 @@
-import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
+import { randomUUID } from "node:crypto";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { db } from "../../../database/client";
 import { resetAuthConfigCache } from "../../routes/auth/config";
 import { createRefreshToken, hashToken, rotateRefreshToken } from "../tokens";
 
 const userId = "550e8400-e29b-41d4-a716-446655440000";
 
 describe("refresh rotation database behavior", () => {
-  const pg = new PGlite();
-  const queries: string[] = [];
-  // The production functions use the shared PostgreSQL query API.
-  const database = drizzle({
-    client: pg,
-    logger: { logQuery: (query) => queries.push(query) },
-  }) as unknown as typeof db;
+  const url = process.env.TEST_DATABASE_URL;
+  if (!url) throw new Error("Set TEST_DATABASE_URL to a disposable PostgreSQL database");
+  const schema = `refresh_test_${randomUUID().replaceAll("-", "")}`;
+  const admin = postgres(url, { max: 1 });
+  const sql = postgres(url, {
+    max: 4,
+    connection: { search_path: schema, application_name: schema },
+  });
+  const database = drizzle({ client: sql });
 
   beforeAll(async () => {
-    await pg.exec(`CREATE TABLE refresh_token (
+    await admin.unsafe(`CREATE SCHEMA ${schema}`);
+    await sql.unsafe(`CREATE TABLE refresh_token (
       refresh_token_id uuid PRIMARY KEY,
       user_id uuid NOT NULL,
       token_hash text UNIQUE NOT NULL,
@@ -34,27 +37,51 @@ describe("refresh rotation database behavior", () => {
     vi.stubEnv("JWT_SECRET", "test-secret");
     vi.stubEnv("REFRESH_TOKEN_TTL_SECONDS", "3600");
     resetAuthConfigCache();
-    await pg.exec("TRUNCATE refresh_token");
-    queries.length = 0;
+    await sql.unsafe("TRUNCATE refresh_token");
   });
 
   afterAll(async () => {
     vi.unstubAllEnvs();
     resetAuthConfigCache();
-    await pg.close();
+    await sql.end();
+    try {
+      await admin.unsafe(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+    } finally {
+      await admin.end();
+    }
   });
 
   it("redeems one token only once across competing calls", async () => {
     const original = await createRefreshToken(database, userId);
-    const results = await Promise.all([
+    // Hold the row so both separate connections must contend for its lock.
+    const blocker = await sql.reserve();
+    await blocker`BEGIN`;
+    await blocker`SELECT * FROM refresh_token WHERE token_hash = ${hashToken(original.token)} FOR UPDATE`;
+    const competing = Promise.all([
       rotateRefreshToken(database, original.token),
       rotateRefreshToken(database, original.token),
     ]);
+    // Observe rejection immediately too, even while polling the lock waiters.
+    void competing.catch(() => {});
+    try {
+      await vi.waitFor(
+        async () => {
+          const [row] = await admin<{ count: number }[]>`
+          SELECT count(*)::int AS count FROM pg_stat_activity
+          WHERE application_name = ${schema} AND wait_event_type = 'Lock'`;
+          expect(row?.count).toBe(2);
+        },
+        { timeout: 5000, interval: 20 },
+      );
+    } finally {
+      await blocker`ROLLBACK`;
+      blocker.release();
+      await competing;
+    }
+    const results = await competing;
     expect(results.filter(Boolean)).toHaveLength(1);
-    const { rows } = await pg.query("SELECT * FROM refresh_token WHERE revoked_at IS NULL");
+    const rows = await sql`SELECT * FROM refresh_token WHERE revoked_at IS NULL`;
     expect(rows).toHaveLength(1);
-    // PGlite serializes transactions; also assert production emits a PostgreSQL row lock.
-    expect(queries.some((query) => /select .*for update/i.test(query))).toBe(true);
     expect(await rotateRefreshToken(database, original.token)).toBeUndefined();
     const replacement = results.find((result) => result !== undefined);
     if (!replacement) throw new Error("Expected one successful rotation");
@@ -63,20 +90,20 @@ describe("refresh rotation database behavior", () => {
 
   it("rolls back consumption if replacement creation fails", async () => {
     const original = await createRefreshToken(database, userId);
-    await pg.exec(`CREATE FUNCTION reject_refresh_insert() RETURNS trigger AS $$
+    await sql.unsafe(`CREATE FUNCTION reject_refresh_insert() RETURNS trigger AS $$
       BEGIN RAISE EXCEPTION 'simulated insert failure'; END;
       $$ LANGUAGE plpgsql;
       CREATE TRIGGER reject_refresh BEFORE INSERT ON refresh_token
       FOR EACH ROW EXECUTE FUNCTION reject_refresh_insert()`);
     try {
       await expect(rotateRefreshToken(database, original.token)).rejects.toThrow();
-      const { rows } = await pg.query<{ revoked_at: Date | null }>(
+      const rows = await sql.unsafe<{ revoked_at: Date | null }[]>(
         "SELECT revoked_at FROM refresh_token WHERE token_hash = $1",
         [hashToken(original.token)],
       );
       expect(rows[0]?.revoked_at).toBeNull();
     } finally {
-      await pg.exec(
+      await sql.unsafe(
         "DROP TRIGGER reject_refresh ON refresh_token; DROP FUNCTION reject_refresh_insert()",
       );
     }
@@ -85,10 +112,10 @@ describe("refresh rotation database behavior", () => {
 
   it("rejects expired and revoked rows without creating replacements", async () => {
     const original = await createRefreshToken(database, userId);
-    await pg.exec("UPDATE refresh_token SET expires_at = now() - interval '1 second'");
+    await sql.unsafe("UPDATE refresh_token SET expires_at = now() - interval '1 second'");
     expect(await rotateRefreshToken(database, original.token)).toBeUndefined();
     expect(await rotateRefreshToken(database, original.token)).toBeUndefined();
-    const { rows } = await pg.query("SELECT * FROM refresh_token");
+    const rows = await sql`SELECT * FROM refresh_token`;
     expect(rows).toHaveLength(1);
   });
 });

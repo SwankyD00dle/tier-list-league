@@ -262,3 +262,31 @@ Refresh-token consumption and replacement run in one transaction with a row lock
 so a token can be redeemed once and failed replacement rolls back consumption.
 Scoring, including corrections to finalized rounds, requires the recorded host to
 remain a game participant. A game-row lock serializes that check with removal.
+
+## PostgreSQL integration tests
+
+Unit tests (`npm test`) need no database. Refresh-token integration tests use the
+existing `postgres` client and Drizzle against a real PostgreSQL server, including
+two connections competing for the same token and rollback on failed replacement.
+
+From the repository root, run the isolated Docker suite:
+
+```bash
+npm run test:integration:docker --workspace @tier-list-league/backend
+```
+
+This builds the migration/test image, starts a separate PostgreSQL 17 service,
+runs the suite, and removes the test containers and volumes afterward. It needs
+Docker Compose, but no Discord credentials or running application services.
+
+Or supply an existing disposable database:
+
+```bash
+TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/tier_list_league_test \
+  npm run test:integration --workspace @tier-list-league/backend
+```
+
+The suite requires `TEST_DATABASE_URL` explicitly, creates a unique schema for each
+run, and drops that schema afterward. Its database role must be able to create
+schemas, tables, and trigger functions. It never uses the application's
+`DATABASE_URL` implicitly.
