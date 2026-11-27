@@ -6,7 +6,6 @@ import {
   submitGuessResponseSchema,
 } from "@tier-list-league/api-schema";
 import { and, eq } from "drizzle-orm";
-import game from "../../../../database/schema/game";
 import guess from "../../../../database/schema/guess";
 import round from "../../../../database/schema/round";
 import roundEvent from "../../../../database/schema/round-event";
@@ -19,6 +18,8 @@ import {
   defineRoute,
   requestSchemaFailure,
 } from "../../../route-helper";
+
+import { getSubmissionContext } from "../submission-context";
 
 export const submitGuess = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -45,34 +46,15 @@ export const submitGuess = (config: BaseHandlerConfig) =>
 
       try {
         const result = await config.db.transaction(async (tx) => {
-          const [roundRow] = await tx
-            .select({
-              game: round.game,
-              guesses: round.guesses,
-              winningGuess: round.winningGuess,
-            })
-            .from(round)
-            .where(eq(round.id, roundId))
-            .limit(1);
-          if (!roundRow) {
-            return { error: "ROUND_NOT_FOUND" as const };
+          const context = await getSubmissionContext(tx, roundId, userId);
+          if (context.error !== undefined) {
+            return { error: context.error };
           }
-          if (roundRow.game === null) {
-            return { error: "PLAYER_NOT_IN_GAME" as const };
-          }
+          const { roundRow } = context;
 
-          const [gameRow] = await tx
-            .select({ participants: game.participants })
-            .from(game)
-            .where(eq(game.id, roundRow.game))
-            .limit(1);
-          if (!gameRow?.participants.includes(userId)) {
-            return { error: "PLAYER_NOT_IN_GAME" as const };
+          if (roundRow.phase !== "guessing" || roundRow.hostedBy === userId) {
+            return { error: "INVALID_PHASE" as const };
           }
-          if (roundRow.winningGuess !== null) {
-            return { error: "ROUND_FINALIZED" as const };
-          }
-
           const [existing] = await tx
             .select({ id: guess.id })
             .from(guess)
@@ -102,6 +84,10 @@ export const submitGuess = (config: BaseHandlerConfig) =>
             return { saved: updated, created: false };
           }
 
+          if (!roundRow.pendingGuessers.includes(userId)) {
+            return { error: "INVALID_PHASE" as const };
+          }
+          const pendingGuessers = roundRow.pendingGuessers.filter((id) => id !== userId);
           const [inserted] = await tx
             .insert(guess)
             .values({ id: randomUUID(), round: roundId, data, createdBy: userId })
@@ -112,7 +98,12 @@ export const submitGuess = (config: BaseHandlerConfig) =>
 
           await tx
             .update(round)
-            .set({ guesses: [...roundRow.guesses, inserted.id], updatedAt: new Date() })
+            .set({
+              guesses: [...roundRow.guesses, inserted.id],
+              pendingGuessers,
+              phase: pendingGuessers.length === 0 ? "judging" : "guessing",
+              updatedAt: new Date(),
+            })
             .where(eq(round.id, roundId));
 
           if (!inserted) {
@@ -168,9 +159,20 @@ export const submitGuess = (config: BaseHandlerConfig) =>
 
 function guessErrorResponse(
   res: ApiResponse<SubmitGuessResponse>,
-  error: "ROUND_NOT_FOUND" | "ROUND_FINALIZED" | "PLAYER_NOT_IN_GAME" | "INSERT_FAILED",
+  error:
+    | "INVALID_PHASE"
+    | "ROUND_NOT_FOUND"
+    | "ROUND_FINALIZED"
+    | "PLAYER_NOT_IN_GAME"
+    | "INSERT_FAILED",
 ) {
   switch (error) {
+    case "INVALID_PHASE":
+      return res.status(409).json({
+        ok: false,
+        code: "INVALID_PHASE",
+        message: "This action is unavailable in the current round phase",
+      });
     case "ROUND_NOT_FOUND":
       return res.status(404).json({ ok: false, code: "NOT_FOUND", message: "Round not found" });
     case "ROUND_FINALIZED":

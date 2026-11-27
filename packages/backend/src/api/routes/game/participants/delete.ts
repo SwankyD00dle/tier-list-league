@@ -72,6 +72,29 @@ export const removeParticipant = (config: BaseHandlerConfig) =>
             .update(game)
             .set({ participants, updatedAt: new Date() })
             .where(eq(game.id, gameId));
+          const guessingRounds = await tx
+            .select({
+              id: round.id,
+              pendingGuessers: round.pendingGuessers,
+              guesses: round.guesses,
+            })
+            .from(round)
+            .where(and(eq(round.game, gameId), eq(round.phase, "guessing")))
+            .for("update");
+          for (const currentRound of guessingRounds) {
+            const pendingGuessers = currentRound.pendingGuessers.filter((id) => id !== userId);
+            await tx
+              .update(round)
+              .set({
+                pendingGuessers,
+                phase:
+                  pendingGuessers.length === 0 && currentRound.guesses.length > 0
+                    ? "judging"
+                    : "guessing",
+                updatedAt: new Date(),
+              })
+              .where(eq(round.id, currentRound.id));
+          }
           await tx
             .update(user)
             .set({ activeGames: sql`array_remove(${user.activeGames}, ${gameId}::uuid)` })

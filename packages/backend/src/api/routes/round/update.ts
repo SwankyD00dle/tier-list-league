@@ -47,10 +47,16 @@ export const updateRound = (config: BaseHandlerConfig) =>
       try {
         const result = await config.db.transaction(async (tx) => {
           const [existing] = await tx
-            .select({ id: round.id, game: round.game, winningGuess: round.winningGuess })
+            .select({
+              id: round.id,
+              game: round.game,
+              winningGuess: round.winningGuess,
+              phase: round.phase,
+            })
             .from(round)
             .where(eq(round.id, roundId))
-            .limit(1);
+            .limit(1)
+            .for("update");
           if (!existing) {
             return { error: "ROUND_NOT_FOUND" as const };
           }
@@ -61,6 +67,9 @@ export const updateRound = (config: BaseHandlerConfig) =>
             return { error: "ROUND_FINALIZED" as const };
           }
 
+          if (existing.phase !== "awaiting_host") {
+            return { error: "ROUND_STARTED" as const };
+          }
           if (hostedBy !== undefined) {
             if (existing.game === null) {
               return { error: "HOST_NOT_IN_GAME" as const };
@@ -69,8 +78,7 @@ export const updateRound = (config: BaseHandlerConfig) =>
               .select({ participants: game.participants })
               .from(game)
               .where(eq(game.id, existing.game))
-              .limit(1)
-              .for("update");
+              .limit(1);
             if (!gameRow?.participants.includes(hostedBy)) {
               return { error: "HOST_NOT_IN_GAME" as const };
             }
@@ -99,6 +107,13 @@ export const updateRound = (config: BaseHandlerConfig) =>
             return res
               .status(404)
               .json({ ok: false, code: "NOT_FOUND", message: "Round not found" });
+          }
+          if (result.error === "ROUND_STARTED") {
+            return res.status(409).json({
+              ok: false,
+              code: "ROUND_STARTED",
+              message: "Round settings are locked after the host submits",
+            });
           }
           if (result.error === "ROUND_FINALIZED") {
             return res.status(409).json({

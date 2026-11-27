@@ -66,10 +66,16 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
           }
 
           const [roundRow] = await tx
-            .select({ id: round.id, game: round.game, hostedBy: round.hostedBy })
+            .select({
+              id: round.id,
+              game: round.game,
+              hostedBy: round.hostedBy,
+              phase: round.phase,
+            })
             .from(round)
             .where(eq(round.id, input.id))
-            .limit(1);
+            .limit(1)
+            .for("update");
           if (!roundRow || roundRow.game !== gameId) {
             return { error: "ROUND_NOT_FOUND" as const };
           }
@@ -77,6 +83,9 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
             return { error: "HOST_MISMATCH" as const };
           }
 
+          if (roundRow.phase !== "judging" && roundRow.phase !== "finalized") {
+            return { error: "INVALID_PHASE" as const };
+          }
           const guesses = await tx
             .select({ id: guess.id, userId: guess.createdBy })
             .from(guess)
@@ -124,6 +133,8 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
           await tx
             .update(round)
             .set({
+              phase: "finalized",
+              pendingGuessers: [],
               winningGuess: input.winningGuess,
               honorableMentions: input.honorableMentions.map(({ guessId }) => guessId),
               honorableMentionDetails: input.honorableMentions,
@@ -174,6 +185,7 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
 function scoreErrorResponse(
   res: ApiResponse<RecordGameScoreResponse>,
   error:
+    | "INVALID_PHASE"
     | "GAME_NOT_FOUND"
     | "ROUND_NOT_FOUND"
     | "HOST_MISMATCH"
@@ -181,6 +193,12 @@ function scoreErrorResponse(
     | "PLAYER_NOT_IN_GAME",
 ) {
   switch (error) {
+    case "INVALID_PHASE":
+      return res.status(409).json({
+        ok: false,
+        code: "INVALID_PHASE",
+        message: "The round must reach judging before scores can be recorded",
+      });
     case "GAME_NOT_FOUND":
       return res.status(404).json({ ok: false, code: "NOT_FOUND", message: "Game not found" });
     case "ROUND_NOT_FOUND":

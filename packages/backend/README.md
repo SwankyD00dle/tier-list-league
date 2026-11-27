@@ -162,3 +162,28 @@ access-token cookie from Discord login. Missing, invalid, or expired cookies ret
 
 The typed frontend client inherits the reduced create-game body from the shared
 schema; submission and scoring callers should continue sending their own user ID.
+
+### Round phases
+
+Round responses expose `phase` and `pendingGuessers`. New rounds start in
+`awaiting_host`. The host submits the canonical tier list to open `guessing`,
+which snapshots the current non-host players who still owe a guess. Existing
+legacy guesses count toward completion. At least one non-host player is required.
+The last required guess moves the round to `judging`. Host scoring moves it to
+`finalized`, and score corrections retain that phase.
+
+Guesses and replacements are accepted during `guessing` only. Hosts cannot guess.
+The canonical host list and round settings lock once guessing opens. Participant
+tier lists remain editable during guessing and judging. Phase violations return
+409. Round creation requires the previous round to be finalized.
+
+Players added after guessing opens join the guessing roster on the next round.
+Removing a pending player removes their obligation and opens judging when all
+remaining guesses are in and at least one guess exists. Submission writes and
+scoring lock the round row so concurrent actions preserve phase and submission
+state. The phase migration backfills existing rounds from their tier lists,
+guesses, winners, and current game membership.
+
+Deadline advancement, zero-submission host handoff, and automatic next-host
+selection remain follow-up work. `endsAt` retains its existing behavior in this
+change.

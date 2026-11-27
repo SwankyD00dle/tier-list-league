@@ -52,6 +52,8 @@ const failure = (status: number) => ({
 const round = {
   id: "round-1",
   game: game.id,
+  phase: "awaiting_host" as const,
+  pendingGuessers: [],
   roundNumber: 1,
   hostedBy: admin.id,
   topic: "Snacks",
