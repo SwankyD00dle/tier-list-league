@@ -7,8 +7,8 @@ import { advanceExpiredRound } from "./deadlines";
 
 type Transaction = Parameters<Parameters<BaseHandlerConfig["db"]["transaction"]>[0]>[0];
 
-// Call within the submission transaction so the lock covers validation and writes.
-export async function getSubmissionContext(tx: Transaction, roundId: string, userId: string) {
+// Keep the lock through authorization, deadline advancement, and the caller's queries.
+export async function getRoundContext(tx: Transaction, roundId: string, userId: string) {
   const [roundRow] = await tx
     .select()
     .from(round)
@@ -29,9 +29,13 @@ export async function getSubmissionContext(tx: Transaction, roundId: string, use
   if (!gameRow?.participants.includes(userId)) {
     return { error: "PLAYER_NOT_IN_GAME" as const };
   }
-  if (roundRow.winningGuess !== null) {
-    return { error: "ROUND_FINALIZED" as const };
-  }
   const activeRound = await advanceExpiredRound(tx, roundRow, gameRow.participants);
   return { roundRow: activeRound, gameRow };
+}
+
+export async function getSubmissionContext(tx: Transaction, roundId: string, userId: string) {
+  const context = await getRoundContext(tx, roundId, userId);
+  if (context.error !== undefined) return { error: context.error };
+  if (context.roundRow.winningGuess !== null) return { error: "ROUND_FINALIZED" as const };
+  return context;
 }

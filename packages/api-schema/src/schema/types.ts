@@ -36,7 +36,12 @@ export type {
   RecordGameScoreResponse,
 } from "./game-score-schema";
 export type { HealthRequest, HealthResponse } from "./health-schema";
-export type { SubmitGuessRequest, SubmitGuessResponse } from "./round-guess-schema";
+export type {
+  GetRoundGuessesRequest,
+  GetRoundGuessesResponse,
+  SubmitGuessRequest,
+  SubmitGuessResponse,
+} from "./round-guess-schema";
 export type {
   CreateRoundRequest,
   CreateRoundResponse,

@@ -17,6 +17,7 @@ import { healthCheck } from "./health/get";
 import { createRound } from "./round/create";
 import { getRound } from "./round/get";
 import { submitGuess } from "./round/guess/create";
+import { getRoundGuesses } from "./round/guess/get";
 import { submitTierList } from "./round/tier-list/create";
 import { updateRound } from "./round/update";
 import { getTierList } from "./tier-list/get";
@@ -55,6 +56,7 @@ export function buildRoutes(config: BaseHandlerConfig): RegisteredRoute[] {
     },
     { method: "GET", path: "/api/rounds/:id", definition: getRound(config) },
     { method: "PATCH", path: "/api/rounds/:id", definition: updateRound(config) },
+    { method: "GET", path: "/api/rounds/:roundId/guesses", definition: getRoundGuesses(config) },
     { method: "POST", path: "/api/rounds/:roundId/guesses", definition: submitGuess(config) },
     { method: "POST", path: "/api/rounds/:roundId/tier-lists", definition: submitTierList(config) },
     { method: "GET", path: "/api/tier-lists/:id", definition: getTierList(config) },

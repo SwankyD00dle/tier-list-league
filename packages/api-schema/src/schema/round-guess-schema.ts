@@ -28,3 +28,13 @@ export const submitGuessResponseSchema = z.extend(apiSuccessResponseSchema, {
 });
 
 export type SubmitGuessResponse = ZodInfer<typeof submitGuessResponseSchema>;
+
+export const getRoundGuessesRequestSchema = z.extend(apiRequestSchema, {
+  params: z.object({ roundId: z.uuid() }),
+});
+export type GetRoundGuessesRequest = ZodInfer<typeof getRoundGuessesRequestSchema>;
+
+export const getRoundGuessesResponseSchema = z.extend(apiSuccessResponseSchema, {
+  guesses: z.array(guessSchema),
+});
+export type GetRoundGuessesResponse = ZodInfer<typeof getRoundGuessesResponseSchema>;
