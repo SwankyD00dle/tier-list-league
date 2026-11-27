@@ -44,6 +44,14 @@ export const updateRound = (config: BaseHandlerConfig) =>
       }
 
       const roundId = req.params.id;
+      if (endsAt && new Date(endsAt) <= new Date()) {
+        return res.status(400).json({
+          ok: false,
+          code: "INVALID_DEADLINE",
+          message: "The deadline must be in the future",
+        });
+      }
+
       try {
         const result = await config.db.transaction(async (tx) => {
           const [existing] = await tx
@@ -91,7 +99,7 @@ export const updateRound = (config: BaseHandlerConfig) =>
               ...(hostedBy === undefined ? {} : { hostedBy }),
               ...(endsAt === undefined
                 ? {}
-                : { endsAt: endsAt === null ? null : new Date(endsAt) }),
+                : { endsAt: endsAt === null ? null : new Date(endsAt), guessingDurationMs: null }),
               updatedAt: new Date(),
             })
             .where(eq(round.id, roundId))

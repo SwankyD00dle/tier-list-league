@@ -60,6 +60,16 @@ export const submitTierList = (config: BaseHandlerConfig) =>
           ) {
             return { error: "INVALID_PHASE" as const };
           }
+          const now = new Date();
+          if (isHost && roundRow.endsAt && roundRow.endsAt <= now) {
+            return { error: "INVALID_PHASE" as const };
+          }
+          const endsAt =
+            roundRow.endsAt ??
+            (roundRow.guessingDurationMs
+              ? new Date(now.getTime() + roundRow.guessingDurationMs)
+              : null);
+          const guessingDurationMs = endsAt ? endsAt.getTime() - now.getTime() : null;
           const existingGuessers = isHost
             ? await tx
                 .select({ userId: guess.createdBy })
@@ -115,6 +125,8 @@ export const submitTierList = (config: BaseHandlerConfig) =>
               ...(isHost
                 ? {
                     tierList: inserted.id,
+                    endsAt,
+                    guessingDurationMs,
                     phase:
                       pendingGuessers.length === 0 ? ("judging" as const) : ("guessing" as const),
                     pendingGuessers,

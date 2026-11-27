@@ -3,6 +3,8 @@ import game from "../../../database/schema/game";
 import round from "../../../database/schema/round";
 import type { BaseHandlerConfig } from "../../handler";
 
+import { advanceExpiredRound } from "./deadlines";
+
 type Transaction = Parameters<Parameters<BaseHandlerConfig["db"]["transaction"]>[0]>[0];
 
 // Call within the submission transaction so the lock covers validation and writes.
@@ -30,5 +32,6 @@ export async function getSubmissionContext(tx: Transaction, roundId: string, use
   if (roundRow.winningGuess !== null) {
     return { error: "ROUND_FINALIZED" as const };
   }
-  return { roundRow, gameRow };
+  const activeRound = await advanceExpiredRound(tx, roundRow, gameRow.participants);
+  return { roundRow: activeRound, gameRow };
 }

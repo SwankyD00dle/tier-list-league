@@ -18,6 +18,7 @@ import {
   defineRoute,
   requestSchemaFailure,
 } from "../../../route-helper";
+import { advanceExpiredRound } from "../../round/deadlines";
 import { aggregateGameScores, aggregateRoundScoreDeltas, buildRoundScoreEntries } from "./service";
 
 export const recordGameScore = (config: BaseHandlerConfig) =>
@@ -65,20 +66,16 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
             return { error: "GAME_NOT_FOUND" as const };
           }
 
-          const [roundRow] = await tx
-            .select({
-              id: round.id,
-              game: round.game,
-              hostedBy: round.hostedBy,
-              phase: round.phase,
-            })
+          const [storedRound] = await tx
+            .select()
             .from(round)
             .where(eq(round.id, input.id))
             .limit(1)
             .for("update");
-          if (!roundRow || roundRow.game !== gameId) {
+          if (!storedRound || storedRound.game !== gameId) {
             return { error: "ROUND_NOT_FOUND" as const };
           }
+          const roundRow = await advanceExpiredRound(tx, storedRound, gameRow.participants);
           if (roundRow.hostedBy !== auth.sub) {
             return { error: "HOST_MISMATCH" as const };
           }
@@ -140,7 +137,6 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
               honorableMentionDetails: input.honorableMentions,
               scoreDeltas,
               updatedAt: now,
-              endsAt: now,
             })
             .where(eq(round.id, input.id));
 

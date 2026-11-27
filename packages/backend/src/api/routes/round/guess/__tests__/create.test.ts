@@ -245,3 +245,33 @@ it.each([
   expect(state.statusCode).toBe(409);
   expect(database.insert).not.toHaveBeenCalled();
 });
+
+it("rejects a late guess and commits the deadline transition", async () => {
+  const events: unknown[] = [];
+  const database = createMockDb({
+    selectResults: [
+      [
+        {
+          id: roundId,
+          game: gameId,
+          phase: "guessing",
+          hostedBy: "host",
+          winningGuess: null,
+          pendingGuessers: [userId],
+          guesses: [guessId],
+          endsAt: new Date(0),
+        },
+      ],
+      [{ participants: [userId] }],
+    ],
+    onInsertValues: (values) => events.push(values),
+  });
+  const { res, state } = createMockResponse();
+  await submitGuess(createMockConfig(database)).handler(
+    await authenticatedRequest({ params: { roundId }, body: { userId, data: "Too late" } }, userId),
+    res,
+  );
+  expect(state.statusCode).toBe(409);
+  expect(events).toHaveLength(1);
+  expect(events[0]).toMatchObject({ kind: "deadline_expired", payload: { outcome: "judging" } });
+});

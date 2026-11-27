@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigint, check, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import game from "./game";
 import tierList from "./tier-list";
 import user from "./user";
@@ -45,6 +45,7 @@ const round = pgTable(
     participantTierLists: uuid("participant_tier_lists_ids").array(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }),
+    guessingDurationMs: bigint("guessing_duration_ms", { mode: "number" }),
     endsAt: timestamp("ends_at", { withTimezone: true }),
   },
   (table) => [

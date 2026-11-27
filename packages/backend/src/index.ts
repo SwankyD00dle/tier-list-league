@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { consoleLogger } from "./api/logger";
 import { createRouter } from "./api/router";
 import { buildRoutes } from "./api/routes";
+import { startDeadlineWorker } from "./api/routes/round/deadlines";
 import { db } from "./database/client";
 
 const port = Number(process.env.PORT ?? 3001);
@@ -17,6 +18,9 @@ const server = createServer((req, res) => {
     }
   });
 });
+
+const stopDeadlines = startDeadlineWorker({ log, db });
+server.on("close", stopDeadlines);
 
 server.listen(port, () => {
   log.info({ port }, "backend listening");

@@ -16,6 +16,8 @@ import {
   defineRoute,
   requestSchemaFailure,
 } from "../../route-helper";
+import { processRoundDeadline } from "./deadlines";
+import { serializeRound } from "./serialize";
 
 export const getRound = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -46,28 +48,11 @@ export const getRound = (config: BaseHandlerConfig) =>
         return forbiddenResponse(res);
       }
 
-      return res.status(200).json({
-        ok: true,
-        round: {
-          id: found.id,
-          game: found.game,
-          roundNumber: found.roundNumber,
-          hostedBy: found.hostedBy,
-          phase: found.phase,
-          pendingGuessers: found.pendingGuessers,
-          topic: found.topic,
-          tierList: found.tierList,
-          guesses: found.guesses,
-          winningGuess: found.winningGuess,
-          honorableMentions: found.honorableMentions,
-          honorableMentionDetails: found.honorableMentionDetails,
-          scoreDeltas: found.scoreDeltas,
-          participantTierLists: found.participantTierLists,
-          createdAt: found.createdAt.toISOString(),
-          updatedAt: found.updatedAt?.toISOString() ?? null,
-          endsAt: found.endsAt?.toISOString() ?? null,
-        },
-      });
+      const current =
+        found.phase === "guessing" && found.endsAt && found.endsAt <= new Date()
+          ? await processRoundDeadline(config.db, found.id)
+          : found;
+      return res.status(200).json({ ok: true, round: serializeRound(current ?? found) });
     },
   });
 
@@ -91,6 +76,7 @@ function getRoundFromDb(database: typeof db, id: string) {
       createdAt: round.createdAt,
       updatedAt: round.updatedAt,
       endsAt: round.endsAt,
+      guessingDurationMs: round.guessingDurationMs,
     })
     .from(round)
     .where(eq(round.id, id))

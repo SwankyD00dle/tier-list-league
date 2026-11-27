@@ -184,6 +184,28 @@ scoring lock the round row so concurrent actions preserve phase and submission
 state. The phase migration backfills existing rounds from their tier lists,
 guesses, winners, and current game membership.
 
-Deadline advancement, zero-submission host handoff, and automatic next-host
-selection remain follow-up work. `endsAt` retains its existing behavior in this
-change.
+### Round deadlines
+
+Set an optional future `endsAt` when creating a round or editing it before the
+host submits. A null deadline allows guessing without a time limit. The host's
+first submission opens guessing and records the remaining window length.
+
+At the cutoff, rounds with guesses enter `judging`. Late guesses and replacements
+receive 409. Empty rounds return to `awaiting_host` with the next different player
+in participant order as host. The same round ID and number are retained, previous
+tier-list associations are cleared, and their submission events remain in history.
+When the replacement host submits, a fresh window of the recorded length starts.
+If no other participant exists, the host becomes unassigned so the admin can add
+players and assign a host. An expired deadline while still awaiting the original
+host must be updated by the admin before that host can submit.
+
+The backend sweeps on startup and every 30 seconds after the previous sweep
+completes. Submissions, scoring, and round reads also process expiry, so the
+background interval does not allow late guesses. Round locks serialize expiry
+with player actions and make repeated sweeps safe across backend instances.
+Deadline events use `actor: null` to identify system actions. Scoring preserves
+the guessing deadline instead of replacing it with the scoring time.
+
+The migration backfills active rounds' window lengths using the earliest host
+submission event, falling back to round creation time for older data. Automatic
+next-host selection after a scored round remains follow-up work.
