@@ -53,8 +53,6 @@ export type {
 export type { SubmitTierListRequest, SubmitTierListResponse } from "./round-tier-list-schema";
 export type { GetTierListRequest, GetTierListResponse } from "./tier-list-schema";
 export type {
-  CreateUserRequest,
-  CreateUserResponse,
   GetUserRequest,
   GetUserResponse,
   ListUsersRequest,

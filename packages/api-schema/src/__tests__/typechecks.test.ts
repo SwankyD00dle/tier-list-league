@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as apiSchema from "../index";
-import { isCreateUserRequest, isGetUserRequest, isGetUserResponse } from "../typechecks";
+import { isCreateGameRequest, isGetUserRequest, isGetUserResponse } from "../typechecks";
 
 const userId = "11111111-1111-4111-8111-111111111111";
 
@@ -19,7 +19,7 @@ describe("request typechecks", () => {
   });
 
   it("rejects a request that is missing its body", () => {
-    expect(isCreateUserRequest({})).toBe(false);
+    expect(isCreateGameRequest({})).toBe(false);
   });
 });
 

@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it, vi } from "vitest";
 import { resetAuthConfigCache } from "../../routes/auth/config";
-import { createRefreshToken, hashToken, rotateRefreshToken } from "../tokens";
+import { createRefreshToken, hashToken, revokeRefreshToken, rotateRefreshToken } from "../tokens";
 
 const userId = "550e8400-e29b-41d4-a716-446655440000";
 
@@ -109,12 +109,19 @@ describe("refresh rotation database behavior", () => {
     expect(await rotateRefreshToken(database, original.token)).toMatchObject({ userId });
   });
 
-  it("rejects expired and revoked rows without creating replacements", async () => {
-    const original = await createRefreshToken(database, userId);
-    await sql.unsafe("UPDATE refresh_token SET expires_at = now() - interval '1 second'");
-    expect(await rotateRefreshToken(database, original.token)).toBeUndefined();
-    expect(await rotateRefreshToken(database, original.token)).toBeUndefined();
-    const rows = await sql`SELECT * FROM refresh_token`;
-    expect(rows).toHaveLength(1);
-  });
+  it.each(["expired", "revoked"])(
+    "rejects %s tokens without creating replacements",
+    async (state) => {
+      const original = await createRefreshToken(database, userId);
+      if (state === "revoked") {
+        await revokeRefreshToken(database, original.token);
+      } else {
+        await sql.unsafe("UPDATE refresh_token SET expires_at = now() - interval '1 second'");
+      }
+      expect(await rotateRefreshToken(database, original.token)).toBeUndefined();
+      expect(await rotateRefreshToken(database, original.token)).toBeUndefined();
+      const rows = await sql`SELECT * FROM refresh_token`;
+      expect(rows).toHaveLength(1);
+    },
+  );
 });

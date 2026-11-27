@@ -3,15 +3,12 @@ import { resetAuthConfigCache } from "../../routes/auth/config";
 import { createMockDb } from "../../test-helpers";
 import {
   createRefreshToken,
-  hashToken,
   revokeRefreshToken,
-  rotateRefreshToken,
   signAccessToken,
   verifyAccessToken,
 } from "../tokens";
 
 const userId = "550e8400-e29b-41d4-a716-446655440000";
-const refreshRowId = "660e8400-e29b-41d4-a716-446655440000";
 
 function setAuthEnv(): void {
   process.env.DISCORD_CLIENT_ID = "client-id";
@@ -53,52 +50,6 @@ describe("auth tokens", () => {
     expect(token.length).toBeGreaterThan(10);
     expect(expiresAt.getTime()).toBeGreaterThan(Date.now());
     expect(database.insert).toHaveBeenCalled();
-  });
-
-  it("rotates a valid refresh token", async () => {
-    const presented = "refresh-token-value";
-    const database = createMockDb({
-      selectResult: [
-        {
-          id: refreshRowId,
-          userId,
-          tokenHash: hashToken(presented),
-          expiresAt: new Date(Date.now() + 60_000),
-          revokedAt: null,
-          createdAt: new Date(),
-        },
-      ],
-      insertResult: [],
-      updateResult: [],
-    });
-
-    const rotated = await rotateRefreshToken(database, presented);
-
-    expect(rotated).toMatchObject({ userId });
-    expect(rotated?.token).toBeTruthy();
-    expect(rotated?.token).not.toBe(presented);
-    expect(database.update).toHaveBeenCalled();
-    expect(database.insert).toHaveBeenCalled();
-  });
-
-  it("rejects an expired refresh token", async () => {
-    const presented = "expired-refresh";
-    const database = createMockDb({
-      selectResult: [
-        {
-          id: refreshRowId,
-          userId,
-          tokenHash: hashToken(presented),
-          expiresAt: new Date(Date.now() - 1000),
-          revokedAt: null,
-          createdAt: new Date(),
-        },
-      ],
-    });
-
-    expect(await rotateRefreshToken(database, presented)).toBeUndefined();
-    expect(database.update).toHaveBeenCalled();
-    expect(database.insert).not.toHaveBeenCalled();
   });
 
   it("revokes a refresh token", async () => {
