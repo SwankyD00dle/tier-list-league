@@ -20,7 +20,7 @@ import {
   requestSchemaFailure,
 } from "../../../route-helper";
 
-import { getSubmissionContext } from "../submission-context";
+import { getSubmissionContext } from "../round-context";
 
 export const submitTierList = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {

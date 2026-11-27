@@ -19,7 +19,7 @@ import {
   requestSchemaFailure,
 } from "../../../route-helper";
 
-import { getSubmissionContext } from "../submission-context";
+import { getSubmissionContext } from "../round-context";
 
 export const submitGuess = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
