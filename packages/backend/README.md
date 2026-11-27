@@ -272,12 +272,13 @@ two connections competing for the same token and rollback on failed replacement.
 From the repository root, run the isolated Docker suite:
 
 ```bash
-npm run test:integration:docker --workspace @tier-list-league/backend
+npm run test:integration --workspace @tier-list-league/backend
 ```
 
-This builds the migration/test image, starts a separate PostgreSQL 17 service,
-runs the suite, and removes the test containers and volumes afterward. It needs
-Docker Compose, but no Discord credentials or running application services.
+Vitest global setup starts PostgreSQL 17 with Docker Compose on a dynamically
+allocated loopback port, waits for readiness, and removes its containers and
+volumes after the suite. Tests run locally; no application image build, Discord
+credentials, or running application services are required.
 
 Or supply an existing disposable database:
 
@@ -286,7 +287,8 @@ TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/tier_list_league_t
   npm run test:integration --workspace @tier-list-league/backend
 ```
 
-The suite requires `TEST_DATABASE_URL` explicitly, creates a unique schema for each
-run, and drops that schema afterward. Its database role must be able to create
+When `TEST_DATABASE_URL` is supplied, global setup uses that database without
+starting or stopping Docker. The suite creates a unique schema for each run and
+drops that schema afterward. Its database role must be able to create
 schemas, tables, and trigger functions. It never uses the application's
 `DATABASE_URL` implicitly.

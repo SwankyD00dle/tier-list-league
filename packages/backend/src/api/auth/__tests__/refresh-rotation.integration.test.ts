@@ -1,15 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, inject, it, vi } from "vitest";
 import { resetAuthConfigCache } from "../../routes/auth/config";
 import { createRefreshToken, hashToken, rotateRefreshToken } from "../tokens";
 
 const userId = "550e8400-e29b-41d4-a716-446655440000";
 
 describe("refresh rotation database behavior", () => {
-  const url = process.env.TEST_DATABASE_URL;
-  if (!url) throw new Error("Set TEST_DATABASE_URL to a disposable PostgreSQL database");
+  const url = inject("testDatabaseUrl");
   const schema = `refresh_test_${randomUUID().replaceAll("-", "")}`;
   const admin = postgres(url, { max: 1 });
   const sql = postgres(url, {
