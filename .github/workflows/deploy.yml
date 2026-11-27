@@ -3,15 +3,13 @@ name: Deploy sandbox
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: sandbox-${{ github.event.pull_request.number || github.ref }}
+  group: sandbox-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -32,7 +30,7 @@ jobs:
       - run: npm run test:integration --workspace @tier-list-league/backend
 
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main'
     needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 35

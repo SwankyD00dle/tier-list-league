@@ -47,7 +47,7 @@ Optionally set the environment variable `PLATFORM_API_URL`; it defaults to
 `https://platform.adaptstaging.com`.
 
 Merge to `main` to deploy, or run **Actions → Deploy sandbox → Run workflow** on `main`.
-PRs run validation only. GitHub serializes deployments, and a sandbox-side lock
+Pull requests only run the separate CI workflow on branch pushes. GitHub serializes deployments, and a sandbox-side lock
 prevents overlapping remote executions if a job is cancelled. The workflow logs the
 exec ID for diagnostics; inspect its output in the platform when a deployment fails.
 A remote exec can continue after GitHub cancellation, so inspect it before retrying.
