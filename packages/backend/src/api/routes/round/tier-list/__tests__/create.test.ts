@@ -3,8 +3,8 @@ import roundEvent from "../../../../../database/schema/round-event";
 import {
   authenticatedRequest,
   createMockConfig,
-  createMockDb,
   createMockResponse,
+  createRoundContextDb,
 } from "../../../../test-helpers";
 import { submitTierList } from "../create";
 
@@ -20,7 +20,7 @@ const data = { SS: [playerId], S: [], A: [], B: [], C: [], D: [], E: [], F: [] }
 describe("submitTierList", () => {
   it("stores the host submission as the round's canonical tier list", async () => {
     const updates: unknown[] = [];
-    const database = createMockDb({
+    const database = createRoundContextDb({
       onUpdateSet: (values) => updates.push(values),
       selectResults: [
         [
@@ -53,7 +53,7 @@ describe("submitTierList", () => {
   });
 
   it("stores a participant submission and returns 201", async () => {
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [
         [
           {
@@ -87,7 +87,7 @@ describe("submitTierList", () => {
   });
 
   it("updates an existing participant tier list and returns 200", async () => {
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [
         [
           {
@@ -122,7 +122,7 @@ describe("submitTierList", () => {
   });
 
   it("rejects submissions on a finalized round", async () => {
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [
         [
           {
@@ -153,7 +153,7 @@ describe("submitTierList", () => {
 });
 
 it.each(["guessing", "judging"])("locks the host tier list during %s", async (phase) => {
-  const database = createMockDb({
+  const database = createRoundContextDb({
     selectResults: [
       [{ game: gameId, phase, hostedBy: hostId, winningGuess: null, tierList: tierListId }],
       [{ participants: [hostId, playerId] }],
@@ -172,7 +172,7 @@ it.each(["guessing", "judging"])("locks the host tier list during %s", async (ph
 it("renews the guessing window when the replacement host submits", async () => {
   const updates: unknown[] = [];
   const before = Date.now();
-  const database = createMockDb({
+  const database = createRoundContextDb({
     selectResults: [
       [
         {

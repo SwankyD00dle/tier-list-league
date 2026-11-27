@@ -4,7 +4,11 @@ import round from "./round";
 import type { TierListEntry } from "./tier-list";
 import user from "./user";
 
-export type RoundEventKind = "guess_submitted" | "tier_list_submitted" | "deadline_expired";
+export type RoundEventKind =
+  | "guess_submitted"
+  | "tier_list_submitted"
+  | "deadline_expired"
+  | "round_finalized";
 type SubmissionPayload = {
   submissionId: string;
   operation: "created" | "updated";
@@ -14,6 +18,13 @@ type SubmissionPayload = {
 );
 
 export type RoundEventPayload =
+  | {
+      kind: "round_finalized";
+      winningGuess: string;
+      nextRoundId: string | null;
+      gameFinished: boolean;
+      winnerIds: string[];
+    }
   | SubmissionPayload
   | {
       kind: "deadline_expired";
@@ -39,7 +50,7 @@ const roundEvent = pgTable(
     index("round_event_round_created_idx").on(table.round, table.createdAt, table.id),
     check(
       "round_event_kind_valid",
-      sql`${table.kind} IN ('guess_submitted', 'tier_list_submitted', 'deadline_expired')`,
+      sql`${table.kind} IN ('guess_submitted', 'tier_list_submitted', 'deadline_expired', 'round_finalized')`,
     ),
     check(
       "round_event_payload_kind_matches",

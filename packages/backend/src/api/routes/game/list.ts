@@ -15,6 +15,7 @@ import {
   defineRoute,
   requestSchemaFailure,
 } from "../../route-helper";
+import { serializeGame } from "./serialize";
 
 export const listGames = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -35,34 +36,14 @@ export const listGames = (config: BaseHandlerConfig) =>
       const games = await listGamesFromDb(config.db, auth.sub);
       return res.status(200).json({
         ok: true,
-        games: games.map((row) => ({
-          id: row.id,
-          name: row.name,
-          description: row.description,
-          participants: row.participants,
-          roundCount: row.roundCount,
-          rounds: row.rounds,
-          createdBy: row.createdBy,
-          createdAt: row.createdAt.toISOString(),
-          updatedAt: row.updatedAt.toISOString(),
-        })),
+        games: games.map(serializeGame),
       });
     },
   });
 
 function listGamesFromDb(database: typeof db, userId: string) {
   return database
-    .select({
-      id: game.id,
-      name: game.name,
-      description: game.description,
-      participants: game.participants,
-      roundCount: game.roundCount,
-      rounds: game.rounds,
-      createdBy: game.createdBy,
-      createdAt: game.createdAt,
-      updatedAt: game.updatedAt,
-    })
+    .select()
     .from(game)
     .where(or(eq(game.createdBy, userId), arrayContains(game.participants, [userId])));
 }

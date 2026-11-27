@@ -39,7 +39,7 @@ export const addParticipant = (config: BaseHandlerConfig) =>
       try {
         const result = await config.db.transaction(async (tx) => {
           const [gameRow] = await tx
-            .select({ createdBy: game.createdBy, participants: game.participants })
+            .select()
             .from(game)
             .where(eq(game.id, gameId))
             .limit(1)
@@ -50,6 +50,7 @@ export const addParticipant = (config: BaseHandlerConfig) =>
           if (gameRow.createdBy !== auth.sub) {
             return { forbidden: true };
           }
+          if (gameRow.status === "finished") return { error: "GAME_FINISHED" as const };
           if (gameRow.participants.includes(userId)) {
             return { error: "ALREADY_PARTICIPANT" as const };
           }
@@ -104,9 +105,13 @@ export const addParticipant = (config: BaseHandlerConfig) =>
 
 function participantErrorResponse(
   res: ApiResponse<ParticipantsResponse>,
-  error: "GAME_NOT_FOUND" | "ALREADY_PARTICIPANT" | "USER_NOT_FOUND",
+  error: "GAME_FINISHED" | "GAME_NOT_FOUND" | "ALREADY_PARTICIPANT" | "USER_NOT_FOUND",
 ) {
   switch (error) {
+    case "GAME_FINISHED":
+      return res
+        .status(409)
+        .json({ ok: false, code: "GAME_FINISHED", message: "The game has finished" });
     case "GAME_NOT_FOUND":
       return res.status(404).json({ ok: false, code: "NOT_FOUND", message: "Game not found" });
     case "USER_NOT_FOUND":

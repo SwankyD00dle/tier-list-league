@@ -209,6 +209,7 @@ async function findParticipantTierListId(
 function tierListErrorResponse(
   res: ApiResponse<SubmitTierListResponse>,
   error:
+    | "GAME_FINISHED"
     | "INVALID_PHASE"
     | "ROUND_NOT_FOUND"
     | "ROUND_FINALIZED"
@@ -216,6 +217,10 @@ function tierListErrorResponse(
     | "INSERT_FAILED",
 ) {
   switch (error) {
+    case "GAME_FINISHED":
+      return res
+        .status(409)
+        .json({ ok: false, code: "GAME_FINISHED", message: "The game has finished" });
     case "INVALID_PHASE":
       return res.status(409).json({
         ok: false,

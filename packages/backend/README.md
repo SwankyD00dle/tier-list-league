@@ -151,13 +151,13 @@ The POST body identifies the round, its recorded host, the winning guess, and ho
 }
 ```
 
-Score reads are keyed by user ID. Each player has a running `total` and only rounds where they scored. A round contains its summed `score` and an `entries` array because one player can receive multiple awards in the same round. Reposting a round replaces that round's prior entries atomically, so retries and corrections do not double-score.
+Score reads are keyed by user ID. Each player has a running `total` and only rounds where they scored. A round contains its summed `score` and an `entries` array because one player can receive multiple awards in the same round. Identical award retries return the existing result without double-scoring or creating another round. Different awards after finalization return `409 ROUND_FINALIZED`; corrections can no longer change an already chosen next host or winner. Honorable mentions are capped at `max(0, floor(current player count / 5) - 1)`, so fewer than ten players permit none.
 
 ### Gameplay mutations
 
 - Creating a game enrolls the authenticated creator and keeps their `activeGames` in sync; admin-only participant add/remove does the same.
 - `POST /api/games/:gameId/rounds` assigns the next round number and links the round to the game; the host must be a participant.
-- Rounds are finalized through `POST /api/games/:gameId/score`; a finalized round rejects further round updates, guesses, and tier lists with `409 ROUND_FINALIZED`.
+- Rounds are finalized through `POST /api/games/:gameId/score`; a finalized round rejects further round updates, guesses, and tier lists with `409 ROUND_FINALIZED` (or `GAME_FINISHED` after game completion).
 - Guess and tier-list submissions upsert: resubmitting replaces that user's previous entry (`201` on create, `200` on replace). One guess per user per round is DB-enforced.
 - A tier-list submission from the round host becomes the round's canonical `tierList`; other participants land in `participantTierLists`.
 
@@ -172,13 +172,14 @@ access-token cookie from Discord login. Missing, invalid, or expired cookies ret
 `401 UNAUTHORIZED`; authenticated callers without the required role receive
 `403 FORBIDDEN` in the shared API error envelope.
 
-- `POST /api/games` accepts `{ name, description, roundCount }`. The session user is
+- `POST /api/games` accepts `{ name, description, roundCount, pointsTarget?, timeoutDays? }`. The session user is
   the admin and sole initial participant. Legacy `createdBy`/`participants` fields
   are ignored; add other users through the admin-only participant endpoint.
 - `GET /api/games` filters in the database to games the caller administers or
   participates in. Clients do not need to fetch all games/users to filter access.
 - Only `game.createdBy` may edit game settings, manage participants, create rounds,
-  or edit round settings (including the assigned host).
+  or edit round settings (including the assigned host). The current round host may
+  also edit its topic before submitting the canonical tier list.
 - Game, round, tier-list, and score reads require current game membership. An admin
   who is no longer enrolled can still manage the game but cannot read participant
   content. Orphaned rounds/tier lists are not publicly readable.
@@ -197,7 +198,7 @@ Round responses expose `phase` and `pendingGuessers`. New rounds start in
 which snapshots the current non-host players who still owe a guess. Existing
 legacy guesses count toward completion. At least one non-host player is required.
 The last required guess moves the round to `judging`. Host scoring moves it to
-`finalized`, and score corrections retain that phase.
+`finalized`, and atomically starts the next round or finishes the game.
 
 Guesses and replacements are accepted during `guessing` only. Hosts cannot guess.
 The canonical host list and round settings lock once guessing opens. Participant
@@ -207,15 +208,17 @@ tier lists remain editable during guessing and judging. Phase violations return
 Players added after guessing opens join the guessing roster on the next round.
 Removing a pending player removes their obligation and opens judging when all
 remaining guesses are in and at least one guess exists. Submission writes and
-scoring lock the round row so concurrent actions preserve phase and submission
-state. The phase migration backfills existing rounds from their tier lists,
+scoring lock the game before the round so concurrent actions preserve phase and
+submission state without lock inversion. Active games require at least two players;
+removing the current host or reducing the roster below two is rejected. The phase migration backfills existing rounds from their tier lists,
 guesses, winners, and current game membership.
 
 ### Round deadlines
 
 Set an optional future `endsAt` when creating a round or editing it before the
-host submits. A null deadline allows guessing without a time limit. The host's
-first submission opens guessing and records the remaining window length.
+host submits. Otherwise the game's `timeoutDays` (default 1, maximum 365) starts
+a guessing window when the host submits. Setting `endsAt` to null restores that
+default window. An explicit deadline overrides it for that round.
 
 At the cutoff, rounds with guesses enter `judging`. Late guesses and replacements
 receive 409. Empty rounds return to `awaiting_host` with the next different player
@@ -234,8 +237,8 @@ Deadline events use `actor: null` to identify system actions. Scoring preserves
 the guessing deadline instead of replacing it with the scoring time.
 
 The migration backfills active rounds' window lengths using the earliest host
-submission event, falling back to round creation time for older data. Automatic
-next-host selection after a scored round remains follow-up work.
+submission event, falling back to round creation time for older data. Legacy
+awaiting-host rounds without a window receive the one-day default.
 
 ### Guess visibility
 
@@ -253,6 +256,47 @@ expired deadline under the shared round lock before applying visibility rules.
 Responses disable caching. Winner IDs, honorable mentions, and score deltas remain
 available through the round and score read endpoints.
 
+
+### Game progression and completion
+
+Games expose `status` (`lobby`, `active`, `finished`), `pointsTarget`, `timeoutDays`,
+`winnerIds`, and `finishedAt`. Settings lock when the admin starts the first round;
+at least two participants are required. With `pointsTarget: null` (default),
+`roundCount` is the number of finalized rounds each current participant must host.
+A positive `pointsTarget` instead ends the game when a current player reaches it,
+regardless of hosting counts. All tied top scorers are joint winners.
+
+Scoring returns `{ ok, round, scores, game, nextRound }`. An unfinished game gets
+one automatic `awaiting_host` round, inheriting the topic and game timeout. The
+winning guesser hosts next unless they previously won and someone has not hosted;
+then an unhosted player is chosen randomly. In rounds-per-player mode, players
+who have exhausted their hosting quota are excluded from selection. The selected
+host can change the topic before submitting. Clients follow `nextRound.id` instead
+of creating subsequent rounds manually. Legacy games with a finalized last round
+can still be continued through the admin round-creation endpoint.
+
+Completion sets `winnerIds` and `finishedAt`, returns `nextRound: null`, removes
+the game from participants' `activeGames`, and rejects further gameplay writes.
+Historical reads remain available under the existing membership access rules.
+Each successful finalization appends one `round_finalized` event containing the
+winning guess, next round ID, completion flag, and game winner IDs. Score writes,
+events, progression, and active-game cleanup commit in one transaction.
+
+### Verify a complete game locally
+
+The game-flow scenarios run with the PostgreSQL integration suite described below.
+They start a local HTTP server using the production router, apply all migrations
+inside a unique test database, seed synthetic users, and authenticate with temporary
+signed sessions. The tests check both ending modes, ties, host rotation, mention
+limits, deadlines, membership changes, and concurrent submissions and scoring.
+The HTTP server, database connections, and test database are cleaned up afterward.
+
+Import `postman/game-flow.collection.json` using the Postman v3 collection format.
+Each group is independently runnable with three users' local access tokens.
+The regular flow plays three rounds to joint winners; the points-target flow
+finishes after one round. Both retrieve guesses for judging, follow automatic
+progression, retry awards, and verify the final state.
+
 ## Authentication boundaries
 
 Users are created only after Discord OAuth verifies their identity. `POST /api/users`
@@ -260,12 +304,12 @@ is no longer registered. User list/detail reads require a valid access cookie an
 remain available to signed-in players for lobby enrollment; they disable caching.
 Refresh-token consumption and replacement run in one transaction with a row lock,
 so a token can be redeemed once and failed replacement rolls back consumption.
-Scoring, including corrections to finalized rounds, requires the recorded host to
+Scoring, including retries of finalized rounds, requires the recorded host to
 remain a game participant. A game-row lock serializes that check with removal.
 
 ## PostgreSQL integration tests
 
-Unit tests (`npm test`) need no database. Refresh-token integration tests use the
+Unit tests (`npm test`) need no database. Refresh-token and game-flow integration tests use the
 existing `postgres` client and Drizzle against a real PostgreSQL server, including
 two connections competing for the same token and rollback on failed replacement.
 
@@ -288,7 +332,8 @@ TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/tier_list_league_t
 ```
 
 When `TEST_DATABASE_URL` is supplied, global setup uses that database without
-starting or stopping Docker. The suite creates a unique schema for each run and
-drops that schema afterward. Its database role must be able to create
+starting or stopping Docker. Refresh-token tests create and drop a unique schema.
+Game-flow tests create and drop a separate database because the initial application migration explicitly
+references the public schema. The database role must be able to create databases,
 schemas, tables, and trigger functions. It never uses the application's
 `DATABASE_URL` implicitly.

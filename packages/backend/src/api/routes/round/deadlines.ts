@@ -1,10 +1,9 @@
 import { and, eq, lte } from "drizzle-orm";
-import game from "../../../database/schema/game";
+import type { Transaction } from "../../../database/client";
 import round, { type Round } from "../../../database/schema/round";
 import roundEvent from "../../../database/schema/round-event";
 import type { BaseHandlerConfig } from "../../handler";
-
-type Transaction = Parameters<Parameters<BaseHandlerConfig["db"]["transaction"]>[0]>[0];
+import { lockRoundGame } from "./lock";
 
 // The caller holds the round lock until the surrounding transaction commits.
 export async function advanceExpiredRound(
@@ -47,25 +46,10 @@ export async function advanceExpiredRound(
 
 export async function processRoundDeadline(database: BaseHandlerConfig["db"], roundId: string) {
   return database.transaction(async (tx) => {
-    const [current] = await tx
-      .select()
-      .from(round)
-      .where(eq(round.id, roundId))
-      .limit(1)
-      .for("update");
-    if (
-      current?.phase !== "guessing" ||
-      !current.endsAt ||
-      current.endsAt > new Date() ||
-      !current.game
-    )
-      return current;
-    const [parent] = await tx
-      .select({ participants: game.participants })
-      .from(game)
-      .where(eq(game.id, current.game))
-      .limit(1);
-    return advanceExpiredRound(tx, current, parent?.participants ?? []);
+    const context = await lockRoundGame(tx, roundId);
+    if (context.error !== undefined) return undefined;
+    if (context.gameRow.status === "finished") return context.roundRow;
+    return advanceExpiredRound(tx, context.roundRow, context.gameRow.participants);
   });
 }
 

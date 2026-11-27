@@ -117,7 +117,7 @@ const adminActions: { method: string; path: string; request: ApiRequest; rows: u
     method: "PATCH",
     path: "/api/rounds/:id",
     request: { params: { id: roundId }, body: { hostedBy: player } },
-    rows: [[roundRow], [gameRow]],
+    rows: [[roundRow], [gameRow], [roundRow]],
   },
 ];
 
@@ -211,7 +211,11 @@ describe("submission identity and roles", () => {
       `${path} rejects a non-member using their own identity, including finalized rounds (%s)`,
       async (winningGuess) => {
         const database = createMockDb({
-          selectResults: [[{ ...roundRow, winningGuess }], [gameRow]],
+          selectResults: [
+            [{ ...roundRow, winningGuess }],
+            [gameRow],
+            [{ ...roundRow, winningGuess }],
+          ],
         });
         const { res, state } = createMockResponse();
         await route("POST", path, database).handler(

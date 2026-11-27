@@ -13,7 +13,7 @@ const createdAt = new Date("2026-01-01T00:00:00.000Z");
 describe("updateGame", () => {
   it("updates provided fields and returns the game", async () => {
     const database = createMockDb({
-      selectResult: [{ createdBy: gameId }],
+      selectResult: [{ createdBy: gameId, status: "lobby" }],
       updateResult: [
         {
           id: gameId,
@@ -21,6 +21,11 @@ describe("updateGame", () => {
           description: "First season",
           participants: [],
           roundCount: 8,
+          status: "lobby",
+          pointsTarget: null,
+          timeoutDays: 1,
+          winnerIds: [],
+          finishedAt: null,
           rounds: [],
           createdBy: null,
           createdAt,

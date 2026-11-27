@@ -16,6 +16,7 @@ import {
   defineRoute,
   requestSchemaFailure,
 } from "../../route-helper";
+import { serializeGame } from "./serialize";
 
 export const getGame = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -48,35 +49,11 @@ export const getGame = (config: BaseHandlerConfig) =>
 
       return res.status(200).json({
         ok: true,
-        game: {
-          id: found.id,
-          name: found.name,
-          description: found.description,
-          participants: found.participants,
-          roundCount: found.roundCount,
-          rounds: found.rounds,
-          createdBy: found.createdBy,
-          createdAt: found.createdAt.toISOString(),
-          updatedAt: found.updatedAt.toISOString(),
-        },
+        game: serializeGame(found),
       });
     },
   });
 
 function getGameFromDb(database: typeof db, id: string) {
-  return database
-    .select({
-      id: game.id,
-      name: game.name,
-      description: game.description,
-      participants: game.participants,
-      roundCount: game.roundCount,
-      rounds: game.rounds,
-      createdBy: game.createdBy,
-      createdAt: game.createdAt,
-      updatedAt: game.updatedAt,
-    })
-    .from(game)
-    .where(eq(game.id, id))
-    .limit(1);
+  return database.select().from(game).where(eq(game.id, id)).limit(1);
 }

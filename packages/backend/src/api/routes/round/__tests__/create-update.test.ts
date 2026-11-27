@@ -4,6 +4,7 @@ import {
   createMockConfig,
   createMockDb,
   createMockResponse,
+  createRoundContextDb,
 } from "../../../test-helpers";
 import { createRound } from "../create";
 import { updateRound } from "../update";
@@ -39,7 +40,11 @@ describe("createRound", () => {
   it("creates the next round and returns 201", async () => {
     const database = createMockDb({
       selectResult: [
-        { createdBy: "550e8400-e29b-41d4-a716-446655440000", participants: [hostId], rounds: [] },
+        {
+          createdBy: "550e8400-e29b-41d4-a716-446655440000",
+          participants: [hostId, gameId],
+          rounds: [],
+        },
       ],
       insertResult: [newRound],
     });
@@ -63,7 +68,7 @@ describe("createRound", () => {
   it("rejects a stale first-round submission without writing", async () => {
     const database = createMockDb({
       selectResults: [
-        [{ createdBy: gameId, participants: [hostId], rounds: [roundId] }],
+        [{ createdBy: gameId, participants: [hostId, gameId], rounds: [roundId] }],
         [{ phase: "finalized" }],
       ],
     });
@@ -84,7 +89,7 @@ describe("createRound", () => {
   it("allows an intentional later round with the current count", async () => {
     const database = createMockDb({
       selectResults: [
-        [{ createdBy: gameId, participants: [hostId], rounds: [roundId] }],
+        [{ createdBy: gameId, participants: [hostId, gameId], rounds: [roundId] }],
         [{ phase: "finalized" }],
       ],
       insertResult: [{ ...newRound, roundNumber: 2 }],
@@ -104,7 +109,11 @@ describe("createRound", () => {
   it("rejects a host who is not a participant", async () => {
     const database = createMockDb({
       selectResult: [
-        { createdBy: "550e8400-e29b-41d4-a716-446655440000", participants: [hostId], rounds: [] },
+        {
+          createdBy: "550e8400-e29b-41d4-a716-446655440000",
+          participants: [hostId, gameId],
+          rounds: [],
+        },
       ],
     });
     const { res, state } = createMockResponse();
@@ -128,10 +137,10 @@ describe("createRound", () => {
 
 describe("updateRound", () => {
   it("updates an unfinalized round", async () => {
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [
         [{ id: roundId, game: gameId, phase: "awaiting_host", winningGuess: null }],
-        [{ createdBy: "550e8400-e29b-41d4-a716-446655440000", participants: [hostId] }],
+        [{ createdBy: "550e8400-e29b-41d4-a716-446655440000", participants: [hostId, gameId] }],
       ],
       updateResult: [{ ...newRound, topic: "New topic", updatedAt: createdAt }],
     });
@@ -147,11 +156,11 @@ describe("updateRound", () => {
   });
 
   it("rejects assigning a host who has been removed", async () => {
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [
         [{ id: roundId, game: gameId, phase: "awaiting_host", winningGuess: null }],
-        [{ createdBy: gameId, participants: [hostId] }],
-        [{ participants: [hostId] }],
+        [{ createdBy: gameId, participants: [hostId, gameId] }],
+        [{ participants: [hostId, gameId] }],
       ],
     });
     const { res, state } = createMockResponse();
@@ -165,10 +174,10 @@ describe("updateRound", () => {
   });
 
   it("rejects updates to a finalized round", async () => {
-    const database = createMockDb({
+    const database = createRoundContextDb({
       selectResults: [
         [{ id: roundId, game: gameId, winningGuess }],
-        [{ createdBy: "550e8400-e29b-41d4-a716-446655440000", participants: [hostId] }],
+        [{ createdBy: "550e8400-e29b-41d4-a716-446655440000", participants: [hostId, gameId] }],
       ],
     });
     const { res, state } = createMockResponse();
@@ -202,7 +211,7 @@ describe("updateRound", () => {
 it("rejects a new round while the previous round is active", async () => {
   const database = createMockDb({
     selectResults: [
-      [{ createdBy: gameId, participants: [hostId], rounds: [roundId] }],
+      [{ createdBy: gameId, participants: [hostId, gameId], rounds: [roundId] }],
       [{ phase: "guessing" }],
     ],
   });

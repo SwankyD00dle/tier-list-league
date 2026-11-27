@@ -37,14 +37,42 @@ function request(overrides?: { hostedBy?: string; honorableGuess?: string }) {
 }
 
 describe("recordGameScore", () => {
-  it.each(["judging", "finalized"])("calculates and persists scores from %s", async (phase) => {
+  it("finalizes scores and the game at the points target", async () => {
+    const phase = "judging";
+    const gameRow = {
+      id: gameId,
+      name: "Test",
+      description: "",
+      status: "active",
+      pointsTarget: 3,
+      timeoutDays: 1,
+      roundCount: 1,
+      rounds: [roundId],
+      winnerIds: [],
+      finishedAt: null,
+      createdBy: hostId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      participants: [
+        hostId,
+        winnerId,
+        mentionId,
+        ...Array.from(
+          { length: 7 },
+          (_, index) => `550e8400-e29b-41d4-a716-4466554400${10 + index}`,
+        ),
+      ],
+    };
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-24T12:00:00.000Z"));
     const updates: unknown[] = [];
     const database = createMockDb({
       onUpdateSet: (values) => updates.push(values),
+      updateResult: [
+        { ...gameRow, status: "finished", winnerIds: [winnerId], finishedAt: new Date() },
+      ],
       selectResults: [
-        [{ participants: [hostId, winnerId, mentionId] }],
+        [gameRow],
         [{ id: roundId, game: gameId, hostedBy: hostId, phase }],
         [
           { id: winningGuess, userId: winnerId },
@@ -77,7 +105,7 @@ describe("recordGameScore", () => {
       expect.objectContaining({ phase: "finalized", pendingGuessers: [] }),
     );
     expect(state.statusCode).toBe(200);
-    expect(state.body).toEqual({
+    expect(state.body).toMatchObject({
       ok: true,
       round: {
         id: roundId,
@@ -130,8 +158,8 @@ describe("recordGameScore", () => {
     });
     expect(database.transaction).toHaveBeenCalledOnce();
     expect(database.delete).toHaveBeenCalledOnce();
-    expect(database.insert).toHaveBeenCalledOnce();
-    expect(database.update).toHaveBeenCalledOnce();
+    expect(database.insert).toHaveBeenCalledTimes(2);
+    expect(database.update).toHaveBeenCalledTimes(2);
     vi.useRealTimers();
   });
 

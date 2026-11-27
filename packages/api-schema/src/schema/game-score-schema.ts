@@ -1,6 +1,8 @@
 import type { infer as ZodInfer } from "zod/mini";
 import * as z from "zod/mini";
 import { apiRequestSchema, apiSuccessResponseSchema } from "./api-schema";
+import { gameSchema } from "./game-schema";
+import { roundSchema } from "./round-schema";
 
 export const scoreEntrySchema = z.object({
   score: z.number().check(z.int(), z.positive()),
@@ -59,6 +61,8 @@ export const recordedRoundScoreSchema = z.object({
 });
 
 export const recordGameScoreResponseSchema = z.extend(apiSuccessResponseSchema, {
+  game: gameSchema,
+  nextRound: z.nullable(roundSchema),
   round: recordedRoundScoreSchema,
   scores: gameScoresSchema,
 });
