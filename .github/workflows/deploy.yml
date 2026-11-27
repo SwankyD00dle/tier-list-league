@@ -1,0 +1,54 @@
+name: Deploy sandbox
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sandbox-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run check
+      - run: npm run typecheck
+      - run: npm test
+      - run: node --test scripts/deploy-sandbox.test.mjs
+      - run: npm run test:integration --workspace @tier-list-league/backend
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    environment: sandbox
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: Build sandbox and switch endpoint
+        run: node scripts/deploy-sandbox.mjs
+        env:
+          PLATFORM_API_URL: ${{ vars.PLATFORM_API_URL || 'https://platform.adaptstaging.com' }}
+          PLATFORM_ENDPOINT_ID: ${{ vars.PLATFORM_ENDPOINT_ID }}
+          PLATFORM_API_KEY: ${{ secrets.PLATFORM_API_KEY }}
+          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+          DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
