@@ -22,10 +22,11 @@ Prepare the sandbox and endpoint yourself before enabling deployment:
 - Keep the sandbox running with Docker, the Compose plugin, Git, Bash, `flock` and curl available.
 - Clone this repository into `/app`, check out `main`, and keep the checkout clean.
   Configure Git access there if the repository needs credentials.
-- Create `/app/packages/backend/.env.compose` with the app's environment variables,
-  including `APP_PUBLIC_URL`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` and `JWT_SECRET`.
-  See the [Compose setup](../packages/backend/README.md#run-the-full-app-with-docker-compose).
-- Start the Compose stack using that env file and the default Compose project name.
+- Configure the sandbox to expose `APP_PUBLIC_URL`, `DISCORD_CLIENT_ID`,
+  `DISCORD_CLIENT_SECRET`, `JWT_SECRET` and `COOKIE_SECURE=true` to deployment execs.
+  Store sensitive values as platform secrets. Compose reads these values from the
+  execution environment; no `.env.compose` file is required.
+- Start the Compose stack with those environment variables and the default Compose project name.
   PostgreSQL must already be running when the deployment executes.
 - Bind the public endpoint to port 3000 and register its Discord OAuth callback URL.
 - Ensure platform execs can access `/app` and Docker. Deployments run as the sandbox's default user.
