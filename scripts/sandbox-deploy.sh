@@ -7,7 +7,7 @@ flock -n 9
 test "$(git branch --show-current)" = main
 git diff --quiet
 git diff --cached --quiet
-compose=(docker compose --env-file packages/backend/.env.compose -f packages/backend/docker-compose.yml)
+compose=(docker compose -f packages/backend/docker-compose.yml)
 "${compose[@]}" config --quiet
 "${compose[@]}" stop frontend backend
 git pull --ff-only origin main
