@@ -16,11 +16,8 @@ export async function advanceExpiredRound(
   if (current.phase !== "guessing" || !current.endsAt || current.endsAt > now) return current;
   const hasGuesses = current.guesses.length > 0;
   const hostIndex = participants.indexOf(current.hostedBy ?? "");
-  const orderedPlayers = [
-    ...participants.slice(hostIndex + 1),
-    ...participants.slice(0, hostIndex + 1),
-  ];
-  const nextHost = orderedPlayers.find((id) => id !== current.hostedBy) ?? null;
+  const nextPlayer = participants.find((id, index) => index > hostIndex && id !== current.hostedBy);
+  const nextHost = nextPlayer ?? participants.find((id) => id !== current.hostedBy) ?? null;
   const changes = hasGuesses
     ? { phase: "judging" as const, pendingGuessers: [], updatedAt: now }
     : {
