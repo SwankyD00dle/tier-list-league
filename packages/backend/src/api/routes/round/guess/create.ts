@@ -6,7 +6,6 @@ import {
   submitGuessResponseSchema,
 } from "@tier-list-league/api-schema";
 import { and, eq } from "drizzle-orm";
-import game from "../../../../database/schema/game";
 import guess from "../../../../database/schema/guess";
 import round from "../../../../database/schema/round";
 import roundEvent from "../../../../database/schema/round-event";
@@ -19,6 +18,8 @@ import {
   defineRoute,
   requestSchemaFailure,
 } from "../../../route-helper";
+
+import { getSubmissionContext } from "../submission-context";
 
 export const submitGuess = (config: BaseHandlerConfig) =>
   defineRoute(config.log, {
@@ -45,37 +46,11 @@ export const submitGuess = (config: BaseHandlerConfig) =>
 
       try {
         const result = await config.db.transaction(async (tx) => {
-          const [roundRow] = await tx
-            .select({
-              phase: round.phase,
-              pendingGuessers: round.pendingGuessers,
-              game: round.game,
-              hostedBy: round.hostedBy,
-              guesses: round.guesses,
-              winningGuess: round.winningGuess,
-            })
-            .from(round)
-            .where(eq(round.id, roundId))
-            .limit(1)
-            .for("update");
-          if (!roundRow) {
-            return { error: "ROUND_NOT_FOUND" as const };
+          const context = await getSubmissionContext(tx, roundId, userId);
+          if (context.error !== undefined) {
+            return { error: context.error };
           }
-          if (roundRow.game === null) {
-            return { error: "PLAYER_NOT_IN_GAME" as const };
-          }
-
-          const [gameRow] = await tx
-            .select({ participants: game.participants })
-            .from(game)
-            .where(eq(game.id, roundRow.game))
-            .limit(1);
-          if (!gameRow?.participants.includes(userId)) {
-            return { error: "PLAYER_NOT_IN_GAME" as const };
-          }
-          if (roundRow.winningGuess !== null) {
-            return { error: "ROUND_FINALIZED" as const };
-          }
+          const { roundRow } = context;
 
           if (roundRow.phase !== "guessing" || roundRow.hostedBy === userId) {
             return { error: "INVALID_PHASE" as const };
