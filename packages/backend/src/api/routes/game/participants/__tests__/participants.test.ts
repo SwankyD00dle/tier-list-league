@@ -114,3 +114,36 @@ describe("participants", () => {
     });
   });
 });
+
+it.each([
+  { pending: [newUserId], guesses: ["guess"], expected: "judging", remaining: [] },
+  {
+    pending: [newUserId, existingId],
+    guesses: ["guess"],
+    expected: "guessing",
+    remaining: [existingId],
+  },
+  { pending: [newUserId], guesses: [], expected: "guessing", remaining: [] },
+])(
+  "updates a removed player's pending round ($expected)",
+  async ({ pending, guesses, expected, remaining }) => {
+    const updates: unknown[] = [];
+    const database = createMockDb({
+      selectResults: [
+        [{ createdBy: gameId, participants: [existingId, newUserId] }],
+        [],
+        [{ id: gameId, pendingGuessers: pending, guesses }],
+      ],
+      onUpdateSet: (values) => updates.push(values),
+    });
+    const { res, state } = createMockResponse();
+    await removeParticipant(createMockConfig(database)).handler(
+      await authenticatedRequest({ params: { gameId, userId: newUserId } }),
+      res,
+    );
+    expect(state.statusCode).toBe(200);
+    expect(updates).toContainEqual(
+      expect.objectContaining({ pendingGuessers: remaining, phase: expected }),
+    );
+  },
+);
