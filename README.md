@@ -50,3 +50,12 @@ for configuration and root/prefixed production verification commands.
 ## Docker deployment
 
 The [full-app Compose setup](packages/backend/README.md#run-the-full-app-with-docker-compose) starts PostgreSQL, migrations, the backend, and the production frontend. Bind the platform endpoint to port 3000.
+
+To deploy automatically from `main` using GitHub Actions secrets and a standard free
+runner for this public repository, follow the [sandbox deployment setup](scripts/DEPLOYMENT.md).
+
+## Continuous integration
+
+The `CI` workflow runs `npm run lint`, `npm run typecheck`, and `npm test` on every
+push and merge queue update. The `Lint, typecheck, test` check is required for `main` by
+the repository's GitHub ruleset. It uses a standard Ubuntu runner with caching disabled.
