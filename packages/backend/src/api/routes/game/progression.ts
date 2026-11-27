@@ -1,12 +1,10 @@
 import { randomInt, randomUUID } from "node:crypto";
 import type { GameScores } from "@tier-list-league/api-schema/types";
 import { eq } from "drizzle-orm";
+import type { Transaction } from "../../../database/client";
 import game, { type Game } from "../../../database/schema/game";
 import round, { type Round } from "../../../database/schema/round";
 import user from "../../../database/schema/user";
-import type { BaseHandlerConfig } from "../../handler";
-
-export type Transaction = Parameters<Parameters<BaseHandlerConfig["db"]["transaction"]>[0]>[0];
 
 export function chooseNextHost(
   parent: Game,

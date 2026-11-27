@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
+import type { Transaction } from "../../../database/client";
 import game from "../../../database/schema/game";
 import round from "../../../database/schema/round";
-import type { Transaction } from "../game/progression";
 
 // Every gameplay mutation locks the game before its round to avoid lock inversion.
 export async function lockRoundGame(tx: Transaction, roundId: string) {

@@ -1,8 +1,6 @@
-import type { BaseHandlerConfig } from "../../handler";
+import type { Transaction } from "../../../database/client";
 import { advanceExpiredRound } from "./deadlines";
 import { lockRoundGame } from "./lock";
-
-type Transaction = Parameters<Parameters<BaseHandlerConfig["db"]["transaction"]>[0]>[0];
 
 // Keep the lock through authorization, deadline advancement, and the caller's queries.
 export async function getRoundContext(tx: Transaction, roundId: string, userId: string) {

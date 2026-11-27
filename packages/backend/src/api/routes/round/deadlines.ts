@@ -1,10 +1,9 @@
 import { and, eq, lte } from "drizzle-orm";
+import type { Transaction } from "../../../database/client";
 import round, { type Round } from "../../../database/schema/round";
 import roundEvent from "../../../database/schema/round-event";
 import type { BaseHandlerConfig } from "../../handler";
 import { lockRoundGame } from "./lock";
-
-type Transaction = Parameters<Parameters<BaseHandlerConfig["db"]["transaction"]>[0]>[0];
 
 // The caller holds the round lock until the surrounding transaction commits.
 export async function advanceExpiredRound(
