@@ -33,6 +33,7 @@ describe("buildRoutes", () => {
       "GET /api/games/:gameId/score/:userId",
       "GET /api/rounds/:id",
       "PATCH /api/rounds/:id",
+      "GET /api/rounds/:roundId/guesses",
       "POST /api/rounds/:roundId/guesses",
       "POST /api/rounds/:roundId/tier-lists",
       "GET /api/tier-lists/:id",

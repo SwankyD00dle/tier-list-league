@@ -7,6 +7,7 @@ import {
   isCreateRoundResponse,
   isGetGameResponse,
   isGetGameScoresResponse,
+  isGetRoundGuessesResponse,
   isGetRoundResponse,
   isGetTierListResponse,
   isGetUserGameScoreResponse,
@@ -117,6 +118,8 @@ export const api = {
   getRound: (id: string) => get(routes.round(id), isGetRoundResponse),
   updateRound: (id: string, body: UpdateRoundBody) =>
     send("PATCH", routes.round(id), body, isUpdateRoundResponse),
+  getRoundGuesses: (roundId: string) =>
+    get(routes.roundGuesses(roundId), isGetRoundGuessesResponse),
   submitGuess: (roundId: string, body: SubmitGuessBody) =>
     send("POST", routes.roundGuesses(roundId), body, isSubmitGuessResponse),
   submitTierList: (roundId: string, body: SubmitTierListBody) =>

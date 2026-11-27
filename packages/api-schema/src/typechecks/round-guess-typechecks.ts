@@ -1,4 +1,8 @@
 import {
+  type GetRoundGuessesRequest,
+  type GetRoundGuessesResponse,
+  getRoundGuessesRequestSchema,
+  getRoundGuessesResponseSchema,
   type SubmitGuessRequest,
   type SubmitGuessResponse,
   submitGuessRequestSchema,
@@ -12,4 +16,11 @@ export function isSubmitGuessRequest(data: unknown): data is SubmitGuessRequest 
 
 export function isSubmitGuessResponse(data: unknown): data is SubmitGuessResponse {
   return matchesSchema(submitGuessResponseSchema, data);
+}
+
+export function isGetRoundGuessesRequest(data: unknown): data is GetRoundGuessesRequest {
+  return matchesSchema(getRoundGuessesRequestSchema, data);
+}
+export function isGetRoundGuessesResponse(data: unknown): data is GetRoundGuessesResponse {
+  return matchesSchema(getRoundGuessesResponseSchema, data);
 }

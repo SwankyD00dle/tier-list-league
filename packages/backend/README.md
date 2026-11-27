@@ -112,6 +112,7 @@ Routes are defined under `src/api/routes/` and registered in `src/api/routes/ind
 | GET    | `/api/games/:gameId/score/:userId` | Get a player's score |
 | GET    | `/api/rounds/:id`          | Get a round by id     |
 | PATCH  | `/api/rounds/:id`          | Update an unfinalized round |
+| GET    | `/api/rounds/:roundId/guesses` | Read guesses visible to the caller |
 | POST   | `/api/rounds/:roundId/guesses` | Submit or replace a guess |
 | POST   | `/api/rounds/:roundId/tier-lists` | Submit or update a tier list |
 | GET    | `/api/tier-lists/:id`      | Get a tier list by id |
@@ -235,6 +236,22 @@ the guessing deadline instead of replacing it with the scoring time.
 The migration backfills active rounds' window lengths using the earliest host
 submission event, falling back to round creation time for older data. Automatic
 next-host selection after a scored round remains follow-up work.
+
+### Guess visibility
+
+`GET /api/rounds/:roundId/guesses` returns `{ ok: true, guesses: [...] }` in
+creation order, with IDs breaking timestamp ties. Each guess includes its ID,
+round, author, text, and creation/update timestamps. The typed frontend client
+exposes `api.getRoundGuesses(roundId)`.
+
+Current game membership is required. Before finalization, players see their own
+guesses, and the recorded host sees all guesses during `judging`. After
+finalization, all current participants see all guesses. Game administration alone
+does not grant access. A player with no visible submission receives an empty list.
+The server filters by the authenticated user in the database and processes any
+expired deadline under the shared round lock before applying visibility rules.
+Responses disable caching. Winner IDs, honorable mentions, and score deltas remain
+available through the round and score read endpoints.
 
 ## Authentication boundaries
 
