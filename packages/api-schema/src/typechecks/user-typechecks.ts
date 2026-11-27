@@ -1,8 +1,4 @@
 import {
-  type CreateUserRequest,
-  type CreateUserResponse,
-  createUserRequestSchema,
-  createUserResponseSchema,
   type GetUserRequest,
   type GetUserResponse,
   getUserRequestSchema,
@@ -28,12 +24,4 @@ export function isListUsersRequest(data: unknown): data is ListUsersRequest {
 
 export function isListUsersResponse(data: unknown): data is ListUsersResponse {
   return matchesSchema(listUsersResponseSchema, data);
-}
-
-export function isCreateUserRequest(data: unknown): data is CreateUserRequest {
-  return matchesSchema(createUserRequestSchema, data);
-}
-
-export function isCreateUserResponse(data: unknown): data is CreateUserResponse {
-  return matchesSchema(createUserResponseSchema, data);
 }

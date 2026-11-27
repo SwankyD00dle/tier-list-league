@@ -13,7 +13,8 @@
     "db:migrate": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local ../../node_modules/drizzle-kit/bin.cjs migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "seed:default-avatars": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local --env-file-if-exists=.env --import tsx src/scripts/seed-default-avatars.ts"
+    "seed:default-avatars": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local --env-file-if-exists=.env --import tsx src/scripts/seed-default-avatars.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "exports": {
     "./schema": "./src/database/schema/types.ts"

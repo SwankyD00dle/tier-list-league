@@ -2,11 +2,9 @@ import {
   type AddParticipantRequest,
   type CreateGameRequest,
   type CreateRoundRequest,
-  type CreateUserRequest,
   isApiErrorResponse,
   isCreateGameResponse,
   isCreateRoundResponse,
-  isCreateUserResponse,
   isGetGameResponse,
   isGetGameScoresResponse,
   isGetRoundGuessesResponse,
@@ -78,7 +76,6 @@ export const routes = {
   tierList: (id: string) => `/api/tier-lists/${encodeURIComponent(id)}`,
 };
 
-export type CreateUserBody = CreateUserRequest["body"];
 /** Caller identity and initial membership come from the access-token cookie. */
 export type CreateGameBody = CreateGameRequest["body"];
 export type UpdateGameBody = UpdateGameRequest["body"];
@@ -98,7 +95,6 @@ export const api = {
 
   listUsers: () => get(routes.users, isListUsersResponse),
   getUser: (id: string) => get(routes.user(id), isGetUserResponse),
-  createUser: (body: CreateUserBody) => send("POST", routes.users, body, isCreateUserResponse),
 
   listGames: () => get(routes.games, isListGamesResponse),
   getGame: (id: string) => get(routes.game(id), isGetGameResponse),

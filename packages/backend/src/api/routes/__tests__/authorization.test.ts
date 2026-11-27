@@ -31,7 +31,7 @@ const tierData = { SS: [], S: [], A: [], B: [], C: [], D: [], E: [], F: [] };
 
 function gameplayRoutes(database = createMockDb()) {
   return buildRoutes(createMockConfig(database)).filter(({ path }) =>
-    /^\/api\/(games|rounds|tier-lists)(\/|$)/.test(path),
+    /^\/api\/(users|games|rounds|tier-lists)(\/|$)/.test(path),
   );
 }
 
@@ -273,4 +273,35 @@ describe("submission identity and roles", () => {
     expect(database.transaction).not.toHaveBeenCalled();
     expectNoWrites(database);
   });
+});
+
+describe("removed host scoring", () => {
+  it.each(["judging", "finalized"])(
+    "denies a removed host during %s before any writes",
+    async (phase) => {
+      const database = createMockDb({
+        selectResults: [[{ ...gameRow, participants: [admin, player] }], [{ ...roundRow, phase }]],
+      });
+      const { res, state } = createMockResponse();
+      await route("POST", "/api/games/:gameId/score", database).handler(
+        await authenticatedRequest(
+          {
+            params: { gameId },
+            body: {
+              round: {
+                id: roundId,
+                hostedBy: host,
+                winningGuess: tierListId,
+                honorableMentions: [],
+              },
+            },
+          },
+          host,
+        ),
+        res,
+      );
+      expectForbidden(state);
+      expectNoWrites(database);
+    },
+  );
 });

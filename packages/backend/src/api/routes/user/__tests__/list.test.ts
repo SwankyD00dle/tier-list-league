@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  authenticatedRequest,
   createMockConfig,
   createMockDb,
   createMockResponse,
@@ -25,7 +26,7 @@ describe("listUsers", () => {
     const { res, state } = createMockResponse();
     const route = listUsers(createMockConfig(database));
 
-    await route.handler(emptyRequest(), res);
+    await route.handler(await authenticatedRequest(emptyRequest()), res);
 
     expect(state.statusCode).toBe(200);
     expect(state.body).toEqual({
@@ -46,7 +47,7 @@ describe("listUsers", () => {
     const { res, state } = createMockResponse();
     const route = listUsers(createMockConfig(createMockDb({ selectResult: [] })));
 
-    await route.handler(emptyRequest(), res);
+    await route.handler(await authenticatedRequest(emptyRequest()), res);
 
     expect(state.statusCode).toBe(200);
     expect(state.body).toEqual({ ok: true, users: [] });

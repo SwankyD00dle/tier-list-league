@@ -20,7 +20,6 @@ describe("buildRoutes", () => {
       "POST /api/auth/logout",
       "GET /api/auth/me",
       "GET /api/users",
-      "POST /api/users",
       "GET /api/users/:id",
       "GET /api/games",
       "POST /api/games",
