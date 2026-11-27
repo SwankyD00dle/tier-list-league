@@ -44,7 +44,7 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
 }
 
 export async function createRefreshToken(
-  database: typeof db,
+  database: Pick<typeof db, "insert">,
   userId: string,
 ): Promise<{ token: string; expiresAt: Date }> {
   const { refreshTokenTtlSeconds } = getAuthConfig();
@@ -65,32 +65,36 @@ export async function rotateRefreshToken(
   database: typeof db,
   presentedToken: string,
 ): Promise<{ userId: string; token: string; expiresAt: Date } | undefined> {
-  const tokenHash = hashToken(presentedToken);
-  const [existing] = await database
-    .select()
-    .from(refreshToken)
-    .where(and(eq(refreshToken.tokenHash, tokenHash), isNull(refreshToken.revokedAt)))
-    .limit(1);
+  // Lock consumption and replacement together; failed issuance rolls back revocation.
+  return database.transaction(async (tx) => {
+    const tokenHash = hashToken(presentedToken);
+    const [existing] = await tx
+      .select()
+      .from(refreshToken)
+      .where(and(eq(refreshToken.tokenHash, tokenHash), isNull(refreshToken.revokedAt)))
+      .limit(1)
+      .for("update");
 
-  if (!existing) {
-    return undefined;
-  }
+    if (!existing) {
+      return undefined;
+    }
 
-  if (existing.expiresAt.getTime() <= Date.now()) {
-    await database
+    if (existing.expiresAt.getTime() <= Date.now()) {
+      await tx
+        .update(refreshToken)
+        .set({ revokedAt: new Date() })
+        .where(eq(refreshToken.id, existing.id));
+      return undefined;
+    }
+
+    await tx
       .update(refreshToken)
       .set({ revokedAt: new Date() })
       .where(eq(refreshToken.id, existing.id));
-    return undefined;
-  }
 
-  await database
-    .update(refreshToken)
-    .set({ revokedAt: new Date() })
-    .where(eq(refreshToken.id, existing.id));
-
-  const created = await createRefreshToken(database, existing.userId);
-  return { userId: existing.userId, ...created };
+    const created = await createRefreshToken(tx, existing.userId);
+    return { userId: existing.userId, ...created };
+  });
 }
 
 export async function revokeRefreshToken(

@@ -22,15 +22,44 @@ cp packages/backend/.env.example packages/backend/.env
 npm run dev --workspace @tier-list-league/backend
 ```
 
-## Run the backend with Docker
+## Run the full app with Docker Compose
 
 From `packages/backend`:
 
 ```bash
-docker compose up --build
+cp .env.compose.example .env.compose
+# Fill in Discord credentials and a random JWT_SECRET.
+docker compose --env-file .env.compose up --build -d
 ```
 
-This starts PostgreSQL and the standalone backend on its internal/development port 3001. The root `npm run dev` command is what exposes the combined frontend + API origin on port 3000.
+Open http://localhost:3000. Compose starts PostgreSQL, runs migrations once,
+waits for the backend's database health check, then starts the production frontend.
+Only port 3000 is published; the frontend proxies `/api/*` to `backend:3001`.
+The backend image includes the shared API-schema workspace. Migration tooling lives
+in a separate Docker build target so the backend runtime omits development dependencies.
+
+For a platform sandbox, install/start Docker first and bind the platform endpoint
+to sandbox port 3000. Set `APP_PUBLIC_URL` to its full HTTPS URL **without a trailing
+slash**, set `COOKIE_SECURE=true`, and register
+`<APP_PUBLIC_URL>/api/auth/discord/callback` with Discord before starting. Compose
+uses the same public URL for the frontend build/start and backend OAuth configuration.
+Rebuild when the public URL changes. Keep `.env.compose` out of version control;
+Docker builds exclude environment files. The frontend image retains build dependencies
+because Next loads its TypeScript configuration at startup.
+
+```bash
+docker compose --env-file .env.compose ps -a
+docker compose --env-file .env.compose logs migrate backend frontend
+curl http://localhost:3000/api/health
+```
+
+For a prefixed endpoint, include its prefix in the health-check URL. Database data
+lives in a Docker volume on the sandbox disk; it is disposable when the sandbox is
+deleted. `docker compose --env-file .env.compose down` retains the volume; adding
+`--volumes` deletes it. Configure the sandbox lifetime explicitly for ongoing hosting.
+
+For host-based `npm run dev`, start a separate local PostgreSQL instance exposing
+localhost:5432; this deployment Compose intentionally keeps database ports internal.
 
 ## Migrations (Drizzle)
 
@@ -70,7 +99,6 @@ Routes are defined under `src/api/routes/` and registered in `src/api/routes/ind
 | ------ | -------------------------- | --------------------- |
 | GET    | `/api/health`              | Liveness + DB probe   |
 | GET    | `/api/users`               | List users            |
-| POST   | `/api/users`               | Create a user         |
 | GET    | `/api/users/:id`           | Get a user by id      |
 | GET    | `/api/games`               | List games            |
 | POST   | `/api/games`               | Create a game         |
@@ -91,9 +119,7 @@ Routes are defined under `src/api/routes/` and registered in `src/api/routes/ind
 Examples through the shared port:
 
 ```bash
-curl http://localhost:3000/api/users
-curl -X POST http://localhost:3000/api/users -H 'content-type: application/json' \
-  -d '{"name":"Ryan","discordUserId":"123","games":[]}'
+curl --cookie "access_token=<token>" http://localhost:3000/api/users
 ```
 
 ### Scoring
@@ -209,3 +235,13 @@ the guessing deadline instead of replacing it with the scoring time.
 The migration backfills active rounds' window lengths using the earliest host
 submission event, falling back to round creation time for older data. Automatic
 next-host selection after a scored round remains follow-up work.
+
+## Authentication boundaries
+
+Users are created only after Discord OAuth verifies their identity. `POST /api/users`
+is no longer registered. User list/detail reads require a valid access cookie and
+remain available to signed-in players for lobby enrollment; they disable caching.
+Refresh-token consumption and replacement run in one transaction with a row lock,
+so a token can be redeemed once and failed replacement rolls back consumption.
+Scoring, including corrections to finalized rounds, requires the recorded host to
+remain a game participant. A game-row lock serializes that check with removal.

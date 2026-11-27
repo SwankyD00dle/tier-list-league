@@ -4,7 +4,7 @@ Web app monorepo (npm workspaces).
 
 ## Packages
 
-- `packages/frontend` — Next.js + React + Tailwind app (deploys to Vercel). `api/api.ts` is the typed client for the backend.
+- `packages/frontend` — Next.js + React + Tailwind app. `api/api.ts` is the typed client for the backend.
 - `packages/backend` — Node API with a PostgreSQL database managed by Drizzle, runnable via Docker.
 - `packages/api-schema` — shared zod mini request/response schemas plus a typecheck per payload. Import `@tier-list-league/api-schema` for schemas and typechecks, or `@tier-list-league/api-schema/types` for types only.
 
@@ -46,3 +46,7 @@ For an ingress-mounted app, set the full `APP_PUBLIC_URL` (including its pathnam
 frontend build and start. Forward that pathname intact to Next; configure backend OAuth URLs
 with the same prefix. See [frontend production routing](packages/frontend/README.md#production-behind-an-ingress-prefix)
 for configuration and root/prefixed production verification commands.
+
+## Docker deployment
+
+The [full-app Compose setup](packages/backend/README.md#run-the-full-app-with-docker-compose) starts PostgreSQL, migrations, the backend, and the production frontend. Bind the platform endpoint to port 3000.

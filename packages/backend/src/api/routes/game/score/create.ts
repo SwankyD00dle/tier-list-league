@@ -61,9 +61,14 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
             .select({ participants: game.participants })
             .from(game)
             .where(eq(game.id, gameId))
-            .limit(1);
+            .limit(1)
+            .for("share");
           if (!gameRow) {
             return { error: "GAME_NOT_FOUND" as const };
+          }
+
+          if (!gameRow.participants.includes(auth.sub)) {
+            return { error: "NOT_PARTICIPANT" as const };
           }
 
           const [storedRound] = await tx
@@ -181,6 +186,7 @@ export const recordGameScore = (config: BaseHandlerConfig) =>
 function scoreErrorResponse(
   res: ApiResponse<RecordGameScoreResponse>,
   error:
+    | "NOT_PARTICIPANT"
     | "INVALID_PHASE"
     | "GAME_NOT_FOUND"
     | "ROUND_NOT_FOUND"
@@ -189,6 +195,8 @@ function scoreErrorResponse(
     | "PLAYER_NOT_IN_GAME",
 ) {
   switch (error) {
+    case "NOT_PARTICIPANT":
+      return forbiddenResponse(res);
     case "INVALID_PHASE":
       return res.status(409).json({
         ok: false,
