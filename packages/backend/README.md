@@ -286,10 +286,10 @@ events, progression, and active-game cleanup commit in one transaction.
 
 The game-flow scenarios run with the PostgreSQL integration suite described below.
 They start a local HTTP server using the production router, apply all migrations
-inside a unique test schema, seed synthetic users, and authenticate with temporary
+inside a unique test database, seed synthetic users, and authenticate with temporary
 signed sessions. The tests check both ending modes, ties, host rotation, mention
 limits, deadlines, membership changes, and concurrent submissions and scoring.
-The HTTP server, database connections, and test schema are cleaned up afterward.
+The HTTP server, database connections, and test database are cleaned up afterward.
 
 Import `postman/game-flow.collection.json` using the Postman v3 collection format.
 Each group is independently runnable with three users' local access tokens.
@@ -332,7 +332,8 @@ TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/tier_list_league_t
 ```
 
 When `TEST_DATABASE_URL` is supplied, global setup uses that database without
-starting or stopping Docker. The suite creates a unique schema for each run and
-drops that schema afterward. Its database role must be able to create
+starting or stopping Docker. Refresh-token tests create and drop a unique schema.
+Game-flow tests create and drop a separate database because the initial application migration explicitly
+references the public schema. The database role must be able to create databases,
 schemas, tables, and trigger functions. It never uses the application's
 `DATABASE_URL` implicitly.
