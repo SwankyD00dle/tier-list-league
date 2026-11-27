@@ -38,6 +38,14 @@ export const createRound = (config: BaseHandlerConfig) =>
       const { gameId } = req.params;
       const { topic, hostedBy, endsAt, expectedRoundCount } = req.body;
 
+      if (endsAt && new Date(endsAt) <= new Date()) {
+        return res.status(400).json({
+          ok: false,
+          code: "INVALID_DEADLINE",
+          message: "The deadline must be in the future",
+        });
+      }
+
       try {
         const result = await config.db.transaction(async (tx) => {
           const [gameRow] = await tx

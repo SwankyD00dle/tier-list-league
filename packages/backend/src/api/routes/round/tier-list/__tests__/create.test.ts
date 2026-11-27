@@ -168,3 +168,39 @@ it.each(["guessing", "judging"])("locks the host tier list during %s", async (ph
   expect(database.insert).not.toHaveBeenCalled();
   expect(database.update).not.toHaveBeenCalled();
 });
+
+it("renews the guessing window when the replacement host submits", async () => {
+  const updates: unknown[] = [];
+  const before = Date.now();
+  const database = createMockDb({
+    selectResults: [
+      [
+        {
+          id: roundId,
+          game: gameId,
+          phase: "awaiting_host",
+          hostedBy: hostId,
+          winningGuess: null,
+          tierList: null,
+          endsAt: null,
+          guessingDurationMs: 60000,
+        },
+      ],
+      [{ participants: [hostId, playerId] }],
+      [],
+    ],
+    insertResult: [{ id: tierListId, createdBy: hostId, data, createdAt, updatedAt: createdAt }],
+    onUpdateSet: (values) => updates.push(values),
+  });
+  const { res, state } = createMockResponse();
+  await submitTierList(createMockConfig(database)).handler(
+    await authenticatedRequest({ params: { roundId }, body: { userId: hostId, data } }, hostId),
+    res,
+  );
+  expect(state.statusCode).toBe(201);
+  const update = updates[0] as { phase: string; endsAt: Date; guessingDurationMs: number };
+  expect(update.phase).toBe("guessing");
+  expect(update.guessingDurationMs).toBe(60000);
+  expect(update.endsAt.getTime()).toBeGreaterThanOrEqual(before + 60000);
+  expect(update.endsAt.getTime()).toBeLessThanOrEqual(Date.now() + 60000);
+});
